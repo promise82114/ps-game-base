@@ -7,8 +7,9 @@ export const classificationOptions = [
 ];
 export const classificationFor = value => classificationOptions.find(option => option.value === value);
 export function matchesClassification(value, {view='all',filter='',customCategory=false} = {}) {
-  if (filter === 'unclassified' ? !!classificationFor(value) : filter && value !== filter) return false;
-  if (value === '不再遊玩' && filter !== '不再遊玩' && (customCategory || view !== 'ignored')) return false;
+  if (filter === 'unclassified') { if (classificationFor(value)) return false; }
+  else if (filter === 'exclude-ignored') { if (value === '不再遊玩') return false; }
+  else if (filter && value !== filter) return false;
   if (!customCategory) {
     const expected = {platinum:'已白金',ignored:'不再遊玩',tracked:'想玩'}[view];
     if (expected && value !== expected) return false;
@@ -85,7 +86,7 @@ function legacyWorkRecords(data,work) {
 export function hasWorkConflicts(data, work) {
   if (data.works && Object.hasOwn(data.works,work.key)) return false;
   const values = legacyWorkRecords(data,work).map(({record:r}) => {
-    return JSON.stringify([r.status,r.favorite,r.note,[...r.categories].sort(),[...r.tags].sort()]);
+    return JSON.stringify([r.status,r.note,[...r.categories].sort(),[...r.tags].sort()]);
   });
   return new Set(values).size > 1;
 }

@@ -89,11 +89,11 @@ test('three simplified choices retain existing stored status codes',()=>{
  assert.equal(classificationFor('遊玩中'),undefined);assert.equal(classificationFor('未開始'),undefined);
  for(const item of classificationOptions){const p=emptyPersonal();p.works['concept:100']={...blankRecord(),status:item.value};assert.equal(personal(JSON.parse(JSON.stringify(p))).works['concept:100'].status,item.value);}
 });
-test('ignored entries are hidden from ordinary views and available through an explicit filter',()=>{
- for(const view of ['all','favorite','missing'])assert.equal(matchesClassification('不再遊玩',{view}),false);
+test('ignored entries remain in ordinary views and are selected only when filtering explicitly',()=>{
+ for(const view of ['all','missing'])assert.equal(matchesClassification('不再遊玩',{view}),true);
  assert.equal(matchesClassification('不再遊玩',{view:'ignored'}),true);
  assert.equal(matchesClassification('不再遊玩',{filter:'不再遊玩',customCategory:true}),true);
- assert.equal(matchesClassification('不再遊玩',{view:'ignored',customCategory:true}),false);
+ assert.equal(matchesClassification('不再遊玩',{view:'ignored',customCategory:true}),true);
  assert.equal(matchesClassification('已白金',{view:'platinum'}),true);assert.equal(matchesClassification('想玩',{view:'platinum'}),false);
  assert.equal(matchesClassification('想玩',{view:'tracked'}),true);
 });
@@ -110,4 +110,17 @@ test('retired ratings remain backup-compatible but do not cause classification c
  p.records.ps4={...blankRecord(),rating:1};p.records.ps5={...blankRecord(),rating:5};
  assert.equal(hasWorkConflicts(p,work),false);
  assert.equal(personal(JSON.parse(JSON.stringify(p))).records.ps5.rating,5);
+});
+test('retired favorites remain backup-compatible without affecting classification or version conflicts',()=>{
+ const p=emptyPersonal(),[work]=groupGames(versions());
+ p.records.ps4={...blankRecord(),favorite:true};p.records.ps5={...blankRecord(),favorite:false};
+ assert.equal(hasWorkConflicts(p,work),false);assert.equal(personal(JSON.parse(JSON.stringify(p))).records.ps4.favorite,true);
+ assert.equal(workRecordFor(p,work).status,'未開始');
+});
+test('excluding ignored items is an optional filter and never changes their stored classification',()=>{
+ assert.equal(matchesClassification('不再遊玩'),true);
+ assert.equal(matchesClassification('不再遊玩',{filter:'exclude-ignored'}),false);
+ for(const value of ['已白金','想玩','未開始','遊玩中'])assert.equal(matchesClassification(value,{filter:'exclude-ignored'}),true);
+ const p=emptyPersonal();p.works.test={...blankRecord(),status:'不再遊玩'};
+ assert.equal(personal(JSON.parse(JSON.stringify(p))).works.test.status,'不再遊玩');
 });
