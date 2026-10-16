@@ -3,3 +3,29 @@
 @media(min-width:1500px){.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}@media(max-width:1150px){aside{width:205px;padding:30px 16px}main{margin-left:205px;padding:32px 25px}.toolbar{flex-wrap:wrap}.search{flex-basis:100%}.stats{gap:10px}.stats>div{padding:15px}.stats small{font-size:9px}.header-actions{flex-direction:column;min-width:133px}.grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}@media(max-width:700px){aside{position:static;width:auto;padding:20px;border-right:0;border-bottom:1px solid var(--line)}.brand small,.aside-footer,.nav-label,.category-head{display:none}#views{display:flex;overflow:auto;margin-top:18px;gap:3px}#views button{white-space:nowrap;padding:9px;font-size:10px}#categories{display:none}main{margin:0;padding:25px 18px}h1{font-size:25px}.eyebrow{font-size:8px}header p{font-size:10px}.header-actions{min-width:110px}.header-actions button{font-size:11px;padding:8px}.stats{grid-template-columns:1fr 1fr;margin:25px 0}.stats strong{font-size:27px}.toolbar select{flex:1;min-width:42%;font-size:11px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 10px}.card-body{padding:12px 10px}.game-title{font-size:11px}.card-meta{font-size:9px;gap:3px}.status-pill{padding:2px 4px}footer{display:block;line-height:2}footer span{display:block}.empty{padding:35px 15px}.empty h2{font-size:18px}.two{gap:10px}dialog{padding:20px}#batch{top:5px}#settings{display:block}}
 .mobile-actions{display:none}@media(max-width:700px){.mobile-actions{display:flex;gap:8px;margin-top:18px}.mobile-actions button{font-size:11px}}
 .mobile-category-filter{display:none}@media(max-width:700px){.mobile-category-filter{display:block}}
+details{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:12px;color:var(--muted)}summary{cursor:pointer}#edit-version-list small{display:block;overflow-wrap:anywhere;font-size:10px}#edit-conflicts{color:#d3b179}
+
+:root{--status-platinum:#75BDF6;--status-ignored:#E65B62;--status-tracked:#E9AD42;--classification-muted:#8996aa}
+[data-tone="platinum"]{--classification-color:var(--status-platinum);--classification-tint:#75bdf618}
+[data-tone="ignored"]{--classification-color:var(--status-ignored);--classification-tint:#e65b6218}
+[data-tone="tracked"]{--classification-color:var(--status-tracked);--classification-tint:#e9ad4218}
+.classification-icon{width:19px;height:19px;flex:none;vertical-align:middle;color:var(--classification-muted)}
+.classification-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 14px}
+.classification-options .status-choice{display:block;position:relative;margin:0;cursor:pointer}
+.status-choice input{position:absolute;width:1px;height:1px;padding:0;border:0;clip-path:inset(50%);overflow:hidden}
+.status-option{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 8px;border:1px solid #364154;border-radius:9px;color:var(--muted);background:#171e2a;transition:border-color .15s,background .15s}
+.status-choice:hover .status-option{border-color:#62728c;background:#202a39}
+.status-choice input:checked+.status-option{border-color:var(--classification-color);background:var(--classification-tint);color:#eef3ff;font-weight:600}
+.status-choice input:checked+.status-option .classification-icon{color:var(--classification-color)}
+.status-choice input:focus-visible+.status-option{outline:2px solid var(--accent);outline-offset:3px}
+.classification-clear{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:10px;color:var(--muted)}
+.classification-clear button{font-size:11px;padding:5px 9px;white-space:nowrap}
+.status-pill{display:inline-flex;align-items:center;gap:5px}
+.status-pill .classification-icon{width:14px;height:14px}
+.status-pill[data-tone]{color:var(--classification-color);border-color:var(--classification-color);background:var(--classification-tint)}
+.status-pill[data-tone] .classification-icon{color:var(--classification-color)}
+#views [data-classification]{display:flex;align-items:center;gap:12px;color:var(--muted);border:1px solid transparent}
+#views [data-classification].active{color:#eef3ff;font-weight:600;border-color:var(--classification-color);background:var(--classification-tint)}
+#views [data-classification].active .classification-icon{color:var(--classification-color)}
+.stats [data-tone] strong{color:var(--classification-color)}
+@media(max-width:700px){.classification-options{gap:6px}.status-option{gap:6px;padding:12px 5px}.classification-clear{align-items:flex-start}.classification-field{padding:10px}#views [data-classification]{gap:6px}}
