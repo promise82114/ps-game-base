@@ -1,0 +1,4 @@
+node_modules/
+*.log
+# Personal exports must not be committed.
+ps-game-base-*.json
