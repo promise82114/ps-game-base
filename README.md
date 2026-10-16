@@ -20,7 +20,7 @@ npm start
 - 推送到 `main` 時自動發布；也可在 Actions 手動執行。手動選擇其他分支時會跳過部署。
 - GitHub repo 的 Settings → Pages → Build and deployment → Source 須選擇 **GitHub Actions**。
 - 此 repo 的預設 Pages 網址為 `https://promise82114.github.io/ps-game-base/`；實際發布網址以 Actions 的部署結果為準。
-- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的腳本至 0.2.1。
+- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的腳本至 0.2.2。
 - Google OAuth Client 的「已授權 JavaScript 來源」須加入 `https://promise82114.github.io`（僅 origin，不含 `/ps-game-base/`）。此設定需由 Google Cloud 管理者操作。
 - 本機與 Pages 的瀏覽器存檔分開；可透過完整 JSON 備份搬移。
 - 與 EDF 相同，首頁設定 `<meta name="robots" content="noindex, nofollow">`，要求支援此規則的搜尋引擎不要收錄。這不是存取控制，知道公開網址的人仍可開啟網站；個人匯入資料不隨靜態網站發布。參考 [Google noindex 說明](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
@@ -39,7 +39,7 @@ npm start
 
 ## 分頁撈取更新
 
-開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.2.1，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
+開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.2.2，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
 
 1. 先在 Chrome / Edge 安裝 Tampermonkey。
 2. 在頁面的「資料與同步」點「安裝 / 更新 Tampermonkey 腳本」，或將副本內容貼入 Tampermonkey 新腳本。
@@ -51,9 +51,13 @@ npm start
 
 管理頁同時核對官方 origin、它開啟的分頁物件與隨機 session；僅完整結果可自動回傳，部分結果需手動匯入。Bearer / Cookie 不會傳給管理頁、JSON 或 Drive；Bearer 只存在官方分頁閉包，Cookie 交由瀏覽器管理。切換 PSN 帳號前重新整理官方分頁。本版管理一個人的遊戲庫，未提供帳號隔離，不要混合匯入不同人的資料。
 
-### 原始研究資料的差異
+### 解析相容性與診斷
 
-建立本專案時，原腳本檔案標示 0.1.1，但同目錄 README / 測試已記錄 0.1.3 的 `/recently-purchased`、URL-encoded POST 與無 Bearer 工作階段支援。新副本已補上這些行為，並沿用原有測試確認。這不代表新副本的跨分頁流程已經過 Sony 真實帳號驗收。
+0.2.2 完整補回原版 0.1.3 的 `parsePayload` 與解析階段診斷。保留 `/recently-purchased`、JSON／批次 GraphQL、URL-encoded POST、Request 複本、無 Bearer 工作階段與管理頁回傳流程。修正 0.2.1 漏掉的「網址參數與表單本文合併」：例如操作名稱在網址、extensions 在表單時，現在可取得查詢碼；表單欄位優先於同名網址欄位。這個缺口已用合成請求重現並修正，但不能斷定使用者截圖的所有格式錯誤都由此造成。
+
+更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.2.2；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
+
+請提供診斷列與面板提示即可，不要提供 Cookie、Bearer、NPSSO 或含授權標頭的 HAR。Sony 真實登入後的同步與分頁回傳仍須實機驗收。
 
 ## 分類管理設計
 
@@ -122,7 +126,7 @@ node --check dist/app.js
 node --check dist/scripts/ps-game-base.user.js
 ```
 
-29 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制。測試資料全為合成資料，不含私人遊戲庫。
+33 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。測試資料全為合成資料，不含私人遊戲庫。
 
 已用本機瀏覽器檢查示範庫、單筆編輯、標籤搜尋、批次分類與 390px 手機版；合成 JSON 的檔案選取、預覽及合併亦已實測（8 筆示範加 2 筆匯入，保留原分類，缺少的舊授權有標示）。Sony 真實帳號自動回傳、Google OAuth 與 Drive 實際讀寫仍需使用者登入驗收；本機與模擬測試不代表外部服務 E2E 成功。
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PS Game Base 遊戲庫
 // @namespace    personal.ps-game-base
-// @version      0.2.1
+// @version      0.2.2
 // @description  在官方遊戲庫同步、搜尋、篩選及匯出自己的數位遊戲授權。
 // @match        https://library.playstation.com/*
 // @match        https://store.playstation.com/*
@@ -37,28 +37,40 @@
   }
   const networkFetch = window.fetch.bind(window);
   const diagnostics = { fetch: 0, xhr: 0, graphql: 0, purchased: 0, noBearer: 0, noHash: 0, parseError: 0 };
+  const operations = new Set();
+  let parseStage = '', lastParseError = '';
   let authorization = '', queryHash = '', generation = 0, pending = null;
   let games = [], complete = false, syncedAt = '', busy = false, message = '等待官方遊戲庫請求。請登入並切換到「已購買」，再開啟面板。';
   let host, root;
+
+  function parsePayload(body, url) {
+    const query = Object.fromEntries(url.searchParams);
+    if (body === undefined || body === null || body === '') return query;
+    const text = String(body).trim();
+    if (text.startsWith('{') || text.startsWith('[')) return JSON.parse(text);
+    const form = Object.fromEntries(new URLSearchParams(text));
+    if (typeof form.operationName === 'string' || typeof form.extensions === 'string') return { ...query, ...form };
+    throw new Error('unrecognized-body');
+  }
 
   function inspect(rawUrl, headers, body) {
     try {
       const url = new URL(String(rawUrl), location.href);
       if (url.origin !== 'https://web.np.playstation.com' || url.pathname !== '/api/graphql/v1/op') return;
       diagnostics.graphql++;
-      let payload;
-      if (body) {
-        try { payload = JSON.parse(body); }
-        catch { const form = new URLSearchParams(body); if (!form.has('operationName')) throw new Error('Unknown body'); payload = Object.fromEntries(form); }
-      } else payload = Object.fromEntries(url.searchParams);
+      parseStage = '請求本文（JSON／表單）';
+      const payload = parsePayload(body, url);
       if (Array.isArray(payload)) {
         for (const operation of payload) inspect(rawUrl, headers, JSON.stringify(operation));
         return;
       }
-      if (payload.operationName !== OPERATION) return;
+      if (typeof payload?.operationName === 'string' && /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(payload.operationName) && operations.size < 6) operations.add(payload.operationName);
+      if (payload?.operationName !== OPERATION) return;
       diagnostics.purchased++;
+      parseStage = 'extensions JSON';
       const extensions = typeof payload.extensions === 'string' ? JSON.parse(payload.extensions) : payload.extensions;
       const hash = extensions?.persistedQuery?.sha256Hash;
+      parseStage = '請求標頭';
       const header = new Headers(headers).get('authorization');
       const token = /^Bearer\s+\S+$/i.test(header || '') ? header : '';
       if (!token) diagnostics.noBearer++;
@@ -74,9 +86,11 @@
         sendBridge('PSGB_STATUS', {message:'已取得官方查詢，正在同步遊戲庫…'});
         queueMicrotask(sync);
       }
-      if (!busy) message = '已取得官方查詢碼，可以同步。有 Bearer 時沿用，否則使用目前瀏覽器登入工作階段。';
+      if (!busy) message = token
+        ? '已取得官方查詢碼與 Bearer，可以同步。登入憑證僅保留於本分頁。'
+        : '已取得官方查詢碼，該請求未帶 Bearer。可以使用目前網頁登入工作階段嘗試同步。';
       render();
-    } catch { diagnostics.parseError++; }
+    } catch { diagnostics.parseError++; lastParseError = parseStage; }
     finally { render(); }
   }
 
@@ -94,9 +108,9 @@
         const hasBody = init?.body !== undefined || (input?.body && input?.clone);
         if (hasBody && typeof init?.body !== 'string' && typeof Request !== 'undefined') {
           const copy = new Request(typeof input?.clone === 'function' ? input.clone() : input, init);
-          copy.text().then(body => inspect(url, headers, body)).catch(() => { diagnostics.parseError++; render(); });
+          copy.text().then(body => inspect(url, headers, body)).catch(() => { diagnostics.parseError++; lastParseError = 'Request 本文複本'; render(); });
         } else inspect(url, headers, typeof init?.body === 'string' ? init.body : undefined);
-      } catch { diagnostics.parseError++; }
+      } catch { diagnostics.parseError++; lastParseError = 'fetch 請求複本'; }
       render();
       return Reflect.apply(originalFetch, this, arguments);
     };
@@ -234,7 +248,7 @@
   function render() {
     if (!root) return;
     root.querySelector('#status').textContent = message;
-    root.querySelector('#diagnostics').textContent = `v0.2.1 · fetch ${diagnostics.fetch} / XHR ${diagnostics.xhr} / GraphQL ${diagnostics.graphql} / 已購買 ${diagnostics.purchased} / 缺授權 ${diagnostics.noBearer} / 缺查詢碼 ${diagnostics.noHash} / 格式錯誤 ${diagnostics.parseError}`;
+    root.querySelector('#diagnostics').textContent = `v0.2.2 · fetch ${diagnostics.fetch} / XHR ${diagnostics.xhr} / GraphQL ${diagnostics.graphql} / 已購買 ${diagnostics.purchased} / 無 Bearer ${diagnostics.noBearer} / 缺查詢碼 ${diagnostics.noHash} / 格式錯誤 ${diagnostics.parseError} · 操作：${[...operations].join(', ') || '尚未辨識'}${lastParseError ? ` · 最近解析失敗：${lastParseError}` : ''}`;
     root.querySelector('#sync').disabled = busy || !queryHash;
     root.querySelector('#stop').disabled = !busy;
     for (const button of root.querySelectorAll('[data-export]')) button.disabled = busy || !games.length;
@@ -265,7 +279,7 @@
     const launch = el('button', 'PS Game Base', root); launch.id = 'launch';
     const panel = el('section', undefined, root); panel.id = 'panel'; panel.hidden = true; panel.setAttribute('aria-label', 'PS Game Base 遊戲庫');
     launch.onclick = () => { panel.hidden = !panel.hidden; render(); };
-    el('h2', 'PS Game Base · 遊戲庫 v0.2.1', panel);
+    el('h2', 'PS Game Base · 遊戲庫 v0.2.2', panel);
     if (bridge) el('p', `由 ${bridge.origin} 開啟：完整同步後，遊戲資料將自動回傳該管理頁供確認。登入憑證不會回傳。`, panel);
     el('p', '僅查詢有效的 PS4／PS5 數位授權，包含免費與 PS Plus。未包含付款紀錄、實體收藏及遊玩時數。權杖與資料僅暫存本分頁，重新整理即清除。', panel);
     const library = el('a', '開啟官方遊戲庫（登入後選「已購買」）', panel); library.href = LIBRARY; library.target = '_blank'; library.rel = 'noopener noreferrer';

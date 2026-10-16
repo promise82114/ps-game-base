@@ -38,7 +38,7 @@ function setup(responses = [], bridgeOrigin = '') {
     setTimeout(fn, ms) { return ms <= 350 ? setTimeout(fn, 0) : setTimeout(fn, ms); }, clearTimeout,
   });
   // Test-only access to the closure; no debug API exists in the installed script.
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.testApi = { inspect, sync, nextOffset, normalize, csvCell, state: () => ({authorization, queryHash, games, complete, busy, message, diagnostics}), stop: () => { generation++; pending?.abort(); } }; })();'), context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.testApi = { inspect, sync, nextOffset, normalize, csvCell, state: () => ({authorization, queryHash, games, complete, busy, message, diagnostics, operations: [...operations], lastParseError}), stop: () => { generation++; pending?.abort(); } }; })();'), context);
   return { api: context.testApi, page, calls, messages };
 }
 function authorize(api) { api.inspect(officialUrl(), { Authorization: 'Bearer test-only' }); }
@@ -186,6 +186,54 @@ test('unrecognized bodies are counted and never enable sync', async () => {
   await api.sync();
   assert.equal(api.state().diagnostics.parseError, 1);
   assert.equal(calls.length, 0);
+});
+
+test('mixed URL and form fields preserve the official operation and hash', () => {
+  const extensions = JSON.stringify({persistedQuery:{sha256Hash:HASH}});
+  const cases = [
+    [endpoint+'?operationName=getPurchasedGameList', new URLSearchParams({extensions}).toString()],
+    [endpoint+'?'+new URLSearchParams({extensions}), 'operationName=getPurchasedGameList'],
+  ];
+  for (const [url,body] of cases) {
+    const {api}=setup();api.inspect(url,{},body);
+    assert.equal(api.state().queryHash,HASH);
+    assert.equal(api.state().diagnostics.purchased,1);
+    assert.equal(api.state().diagnostics.parseError,0);
+  }
+});
+
+test('mixed URL and form fields work through fetch and XHR without consuming request body', async () => {
+  const url=endpoint+'?operationName=getPurchasedGameList';
+  const body=new URLSearchParams({extensions:JSON.stringify({persistedQuery:{sha256Hash:HASH}})});
+  const first=setup();const original=new Request(url,{method:'POST',body});
+  await first.page.fetch(original);await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(first.api.state().queryHash,HASH);assert.equal(original.bodyUsed,false);
+  const second=setup();const xhr=new second.page.XMLHttpRequest();xhr.open('POST',url);xhr.send(body);
+  assert.equal(second.api.state().queryHash,HASH);
+});
+
+test('diagnostics identify fixed parsing stages and bound public operation names without secrets', async () => {
+  const {api,page}=setup();
+  api.inspect(endpoint,{},'private-body');assert.equal(api.state().lastParseError,'請求本文（JSON／表單）');
+  api.inspect(endpoint,{},JSON.stringify({operationName:'getPurchasedGameList',extensions:'private-invalid-json'}));
+  assert.equal(api.state().lastParseError,'extensions JSON');
+  api.inspect(officialUrl(),{'invalid\nheader':'private-header'});assert.equal(api.state().lastParseError,'請求標頭');
+  await page.fetch('not a URL',{method:'POST',body:new URLSearchParams('a=b')});
+  assert.equal(api.state().lastParseError,'fetch 請求複本');
+  for(const operationName of ['bad operation!', 'a'.repeat(65), ...Array.from({length:10},(_,i)=>'PublicOperation'+i)]) api.inspect(endpoint,{},JSON.stringify({operationName}));
+  assert.equal(api.state().operations.length,6);assert.ok(!api.state().operations.includes('bad operation!'));
+  const diagnostic=JSON.stringify({counts:api.state().diagnostics,operations:api.state().operations,lastParseError:api.state().lastParseError});
+  for(const secret of ['private-body','private-invalid-json','private-header','test-only'])assert.ok(!diagnostic.includes(secret));
+});
+
+test('mixed form parsing triggers exactly one complete result on the existing bridge', async () => {
+  const {api,messages,calls}=setup([{games:[game(1)]}],'https://promise82114.github.io');
+  const url=endpoint+'?operationName=getPurchasedGameList';
+  const body=new URLSearchParams({extensions:JSON.stringify({persistedQuery:{sha256Hash:HASH}})}).toString();
+  api.inspect(url,{},body);api.inspect(url,{},body);
+  await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(calls.length,1);assert.equal(messages.filter(m=>m.value.type==='PSGB_RESULT').length,1);
+  assert.equal(messages.find(m=>m.value.type==='PSGB_RESULT').value.payload.complete,true);
 });
 test('entry uses recently-purchased while metadata supports the entire library host', () => {
   assert.match(source, /const LIBRARY = 'https:\/\/library\.playstation\.com\/recently-purchased'/);
