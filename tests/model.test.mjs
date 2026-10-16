@@ -42,6 +42,51 @@ test('missing concept IDs never merge by name and cannot collide with concept ke
  const games=[{...game('a'),name:'Identical'},{...game('b'),name:'Identical',conceptId:''},{...game('100'),conceptId:' '},...versions()];
  assert.equal(groupGames(games).length,4);assert.equal(new Set(groupGames(games).map(w=>w.key)).size,4);
 });
+
+const eiyuden=()=>[
+ {name:'百英雄傳',entitlementId:'UP4040-CUSA29566_00-EIYUDEN100HEROES',platform:'PS4',membership:'PS_PLUS',productId:'UP4040-PPSA04721_00-EIYUDENHEROESPS5',titleId:'CUSA29566_00',isActive:true,isDownloadable:true,isPreOrder:false},
+ {name:'百英雄傳',entitlementId:'UP4040-PPSA04721_00-EIYUDEN100HEROES',platform:'PS5',membership:'PS_PLUS',productId:'UP4040-PPSA04721_00-EIYUDENHEROESPS5',titleId:'PPSA04721_00',isActive:true,isDownloadable:true,isPreOrder:false},
+];
+test('Eiyuden PS4 and PS5 exports without conceptId merge by their shared productId',()=>{
+ const games=library({schemaVersion:1,complete:true,games:eiyuden()}).games,before=JSON.stringify(games),works=groupGames(games);
+ assert.equal(works.length,1);assert.equal(works[0].key,'product:'+games[0].productId);
+ assert.deepEqual(works[0].platforms,['PS4','PS5']);assert.equal(works[0].members.length,2);
+ assert.equal(works[0].platform,'PS5');assert.equal(JSON.stringify(games),before);
+});
+test('concept takes priority over product, empty IDs fall back to entitlement, and names never join groups',()=>{
+ const games=[
+  {...game('a'),conceptId:'one',productId:'shared'},
+  {...game('b'),conceptId:'two',productId:'shared'},
+  {...game('c'),conceptId:'one',productId:'different'},
+  {...game('d'),name:'Same',productId:'one'},
+  {...game('e'),name:'Same',productId:'other'},
+  {...game('f'),conceptId:' ',productId:' '},
+  {...game('g'),name:'Same'},
+ ];
+ const works=groupGames(games);assert.equal(works.length,6);
+ assert.equal(works.find(w=>w.key==='concept:one').members.length,2);
+ assert.ok(works.some(w=>w.key==='product:one'));assert.ok(works.some(w=>w.key==='entitlement:f'));
+ assert.ok(works.some(w=>w.key==='entitlement:g'));
+});
+test('new product groups retain previous per-entitlement edits and shared edits survive backup round-trip',()=>{
+ const games=eiyuden(),p=emptyPersonal();p.categories=['劇情'];
+ p.works['entitlement:'+games[0].entitlementId]={...blankRecord(),note:'PS4 note',updatedAt:'2026-10-15T00:00:00Z'};
+ p.works['entitlement:'+games[1].entitlementId]={...blankRecord(),status:'想玩',note:'PS5 note',categories:['劇情'],updatedAt:'2026-10-16T00:00:00Z'};
+ const previous=JSON.stringify(p),[work]=groupGames(games);
+ assert.equal(workRecordFor(p,work).note,'PS5 note');assert.equal(hasWorkConflicts(p,work),true);assert.equal(JSON.stringify(p),previous);
+ p.works[work.key]={...workRecordFor(p,work),status:'已白金',note:'shared note'};
+ const data=parseImport(JSON.parse(JSON.stringify({schemaVersion:1,kind:'ps-game-base-backup',library:{schemaVersion:1,complete:true,games},personal:p})));
+ const [restored]=groupGames(data.library.games);assert.equal(workRecordFor(data.personal,restored).status,'已白金');
+ assert.equal(workRecordFor(data.personal,restored).note,'shared note');assert.equal(hasWorkConflicts(data.personal,restored),false);
+ assert.equal(data.personal.works['entitlement:'+games[0].entitlementId].note,'PS4 note');
+});
+test('later concept metadata can still read the shared product-level record without changing it',()=>{
+ const games=eiyuden(),p=emptyPersonal();p.works['product:'+games[0].productId]={...blankRecord(),status:'想玩',note:'product note'};
+ const [work]=groupGames(games.map(g=>({...g,conceptId:'concept-later'}))),before=JSON.stringify(p);
+ assert.equal(work.key,'concept:concept-later');assert.equal(workRecordFor(p,work).note,'product note');
+ assert.equal(workRecordFor(p,work).status,'想玩');assert.equal(JSON.stringify(p),before);
+ p.works[work.key]={...blankRecord(),note:'new concept note'};assert.equal(workRecordFor(p,work).note,'new concept note');
+});
 test('platform and membership filters must match the same entitlement inside a work',()=>{
  const [work]=groupGames(versions());
  assert.equal(matchesWorkFilters(work,{platform:'PS4',membership:'PS_PLUS'}),false);

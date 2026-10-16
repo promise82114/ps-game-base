@@ -58,7 +58,8 @@ export function groupGames(games, missingIds = []) {
   const grouped = new Map(), missing = new Set(missingIds);
   for (const game of games) {
     const concept = typeof game.conceptId === 'string' ? game.conceptId.trim() : '';
-    const key = concept ? 'concept:' + concept : 'entitlement:' + game.entitlementId;
+    const product = typeof game.productId === 'string' ? game.productId.trim() : '';
+    const key = concept ? 'concept:' + concept : product ? 'product:' + product : 'entitlement:' + game.entitlementId;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(game);
   }
@@ -71,15 +72,17 @@ export function groupGames(games, missingIds = []) {
 export function workRecordFor(data, work) {
   if (data.works && Object.hasOwn(data.works, work.key)) return data.works[work.key];
   // Existing entitlement notes stay intact. Use the most recently saved record
-  // until the user makes a shared edit; ties are resolved by stable ID.
+  // until the user makes a shared edit; ties are resolved by stable record key.
   const saved = legacyWorkRecords(data,work);
   saved.sort((a,b) => b.record.updatedAt.localeCompare(a.record.updatedAt) || a.id.localeCompare(b.id));
   return saved.length ? saved[0].record : blankRecord();
 }
 function legacyWorkRecords(data,work) {
   return work.members.flatMap(g => {
-    const key = 'entitlement:' + g.entitlementId;
-    if (data.works && Object.hasOwn(data.works,key)) return [{id:g.entitlementId,record:data.works[key]}];
+    const product = typeof g.productId === 'string' ? g.productId.trim() : '';
+    const keys = ['entitlement:' + g.entitlementId, ...(product ? ['product:' + product] : [])]
+      .filter(key => key !== work.key && data.works && Object.hasOwn(data.works,key));
+    if (keys.length) return keys.map(key => ({id:key,record:data.works[key]}));
     return Object.hasOwn(data.records,g.entitlementId) ? [{id:g.entitlementId,record:data.records[g.entitlementId]}] : [];
   });
 }
