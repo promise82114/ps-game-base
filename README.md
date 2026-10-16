@@ -23,6 +23,7 @@ npm start
 - 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的腳本至 0.2.1。
 - Google OAuth Client 的「已授權 JavaScript 來源」須加入 `https://promise82114.github.io`（僅 origin，不含 `/ps-game-base/`）。此設定需由 Google Cloud 管理者操作。
 - 本機與 Pages 的瀏覽器存檔分開；可透過完整 JSON 備份搬移。
+- 與 EDF 相同，首頁設定 `<meta name="robots" content="noindex, nofollow">`，要求支援此規則的搜尋引擎不要收錄。這不是存取控制，知道公開網址的人仍可開啟網站；個人匯入資料不隨靜態網站發布。參考 [Google noindex 說明](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
 
 本次只準備發布設定，不會自動推送遠端或變更 GitHub / Google Cloud 設定。
 
