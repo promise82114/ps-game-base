@@ -62,7 +62,9 @@ function quickClassifications(game,status){
   const item=classificationFor(value),label=el('label',undefined,'quick-choice'),input=el('input'),visual=el('span',undefined,'quick-option');
   label.dataset.tone=item.tone;label.title=item.label;input.type='radio';input.name='quick-'+game.key;input.value=value;input.checked=status===value;input.dataset.workKey=game.key;input.setAttribute('aria-label',game.name+'：'+item.label);visual.append(icon(item.icon));label.append(input,visual);controls.append(label);
   label.onpointerdown=()=>{keyboard=false;};input.onkeydown=()=>{keyboard=true;};
-  input.onchange=()=>{if(!input.checked)return;update(game.key,{status:value});persist();render();if(keyboard){const replacement=[...$('grid').querySelectorAll('.quick-choice input')].find(n=>n.dataset.workKey===game.key&&n.value===value);replacement?.focus();}};
+  const saveStatus=next=>{update(game.key,{status:next});persist();render();if(keyboard){const replacement=[...$('grid').querySelectorAll('.quick-choice input')].find(n=>n.dataset.workKey===game.key&&n.value===value);replacement?.focus();}};
+  input.onclick=e=>{e.preventDefault();saveStatus(status===value?'未開始':value);};
+  input.onchange=()=>{if(input.checked)saveStatus(value);};
  }
  return controls;
 }
