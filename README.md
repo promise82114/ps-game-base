@@ -13,6 +13,19 @@ npm start
 
 開啟 http://127.0.0.1:4175 。請固定使用相同主機及連接埠，瀏覽器本機存檔依 origin 區分。不要直接雙擊 HTML（ES module、OAuth 與分頁回傳均需要 HTTP 來源）。靜態部署時以 `dist` 為網站根目錄即可。
 
+## GitHub Pages 發布
+
+發布設定檔為 `.github/workflows/deploy.yml`，沿用 EDF 專案的 Pages Actions 流程，直接將 `dist` 上傳發布，無須建置。
+
+- 推送到 `main` 時自動發布；也可在 Actions 手動執行。手動選擇其他分支時會跳過部署。
+- GitHub repo 的 Settings → Pages → Build and deployment → Source 須選擇 **GitHub Actions**。
+- 此 repo 的預設 Pages 網址為 `https://promise82114.github.io/ps-game-base/`；實際發布網址以 Actions 的部署結果為準。
+- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的腳本至 0.2.1。
+- Google OAuth Client 的「已授權 JavaScript 來源」須加入 `https://promise82114.github.io`（僅 origin，不含 `/ps-game-base/`）。此設定需由 Google Cloud 管理者操作。
+- 本機與 Pages 的瀏覽器存檔分開；可透過完整 JSON 備份搬移。
+
+本次只準備發布設定，不會自動推送遠端或變更 GitHub / Google Cloud 設定。
+
 ## 使用
 
 1. 按「匯入 JSON」，選擇既有撈取腳本產生的 JSON，先看筆數與完整性，再確認匯入。
@@ -25,7 +38,7 @@ npm start
 
 ## 分頁撈取更新
 
-開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.2.0，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
+開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.2.1，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
 
 1. 先在 Chrome / Edge 安裝 Tampermonkey。
 2. 在頁面的「資料與同步」點「安裝 / 更新 Tampermonkey 腳本」，或將副本內容貼入 Tampermonkey 新腳本。
@@ -33,7 +46,7 @@ npm start
 4. 登入並選「已購買」。腳本在觀察到官方 `getPurchasedGameList` 查詢後，自動循序撈取，完成後回傳管理頁供預覽、確認匯入。
 5. 若瀏覽器／官方登入跳轉使 opener 或網址片段失效，五分鐘後會提示。可在官方分頁開啟 PS Game Base 面板，手動同步、匯出 JSON 再匯入。
 
-回傳限制來源為腳本內的 `MANAGER_ORIGINS`（預設只信任本專案的 `http://127.0.0.1:4175` 與 `http://localhost:4175`）。改埠或部署至 HTTPS 時，請將你信任的完整 origin 明確加入該清單，再更新已安裝的腳本。不可直接信任任意網址片段提供的來源，否則其他網站也可能開啟官方庫並接收資料。
+回傳限制來源為腳本內的 `MANAGER_ORIGINS`（允許本專案的 `http://127.0.0.1:4175`、`http://localhost:4175` 與 `https://promise82114.github.io`）。改埠或改用其他部署網址時，請將你信任的完整 origin 明確加入該清單，再更新已安裝的腳本。不可直接信任任意網址片段提供的來源，否則其他網站也可能開啟官方庫並接收資料。
 
 管理頁同時核對官方 origin、它開啟的分頁物件與隨機 session；僅完整結果可自動回傳，部分結果需手動匯入。Bearer / Cookie 不會傳給管理頁、JSON 或 Drive；Bearer 只存在官方分頁閉包，Cookie 交由瀏覽器管理。切換 PSN 帳號前重新整理官方分頁。本版管理一個人的遊戲庫，未提供帳號隔離，不要混合匯入不同人的資料。
 

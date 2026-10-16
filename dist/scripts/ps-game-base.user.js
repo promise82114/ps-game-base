@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PS Game Base 遊戲庫
 // @namespace    personal.ps-game-base
-// @version      0.2.0
+// @version      0.2.1
 // @description  在官方遊戲庫同步、搜尋、篩選及匯出自己的數位遊戲授權。
 // @match        https://library.playstation.com/*
 // @match        https://store.playstation.com/*
@@ -20,7 +20,7 @@
   const ENDPOINT = 'https://web.np.playstation.com/api/graphql/v1/op';
   const OPERATION = 'getPurchasedGameList';
   // Add a deployed manager origin here only after you explicitly trust it.
-  const MANAGER_ORIGINS = new Set(['http://127.0.0.1:4175', 'http://localhost:4175']);
+  const MANAGER_ORIGINS = new Set(['http://127.0.0.1:4175', 'http://localhost:4175', 'https://promise82114.github.io']);
   // Only library data crosses the bridge; bearer tokens stay in this tab.
   let bridge = null, bridgeStarted = false;
   try {
@@ -234,7 +234,7 @@
   function render() {
     if (!root) return;
     root.querySelector('#status').textContent = message;
-    root.querySelector('#diagnostics').textContent = `v0.2.0 · fetch ${diagnostics.fetch} / XHR ${diagnostics.xhr} / GraphQL ${diagnostics.graphql} / 已購買 ${diagnostics.purchased} / 缺授權 ${diagnostics.noBearer} / 缺查詢碼 ${diagnostics.noHash} / 格式錯誤 ${diagnostics.parseError}`;
+    root.querySelector('#diagnostics').textContent = `v0.2.1 · fetch ${diagnostics.fetch} / XHR ${diagnostics.xhr} / GraphQL ${diagnostics.graphql} / 已購買 ${diagnostics.purchased} / 缺授權 ${diagnostics.noBearer} / 缺查詢碼 ${diagnostics.noHash} / 格式錯誤 ${diagnostics.parseError}`;
     root.querySelector('#sync').disabled = busy || !queryHash;
     root.querySelector('#stop').disabled = !busy;
     for (const button of root.querySelectorAll('[data-export]')) button.disabled = busy || !games.length;
@@ -265,7 +265,7 @@
     const launch = el('button', 'PS Game Base', root); launch.id = 'launch';
     const panel = el('section', undefined, root); panel.id = 'panel'; panel.hidden = true; panel.setAttribute('aria-label', 'PS Game Base 遊戲庫');
     launch.onclick = () => { panel.hidden = !panel.hidden; render(); };
-    el('h2', 'PS Game Base · 遊戲庫 v0.2.0', panel);
+    el('h2', 'PS Game Base · 遊戲庫 v0.2.1', panel);
     if (bridge) el('p', `由 ${bridge.origin} 開啟：完整同步後，遊戲資料將自動回傳該管理頁供確認。登入憑證不會回傳。`, panel);
     el('p', '僅查詢有效的 PS4／PS5 數位授權，包含免費與 PS Plus。未包含付款紀錄、實體收藏及遊玩時數。權杖與資料僅暫存本分頁，重新整理即清除。', panel);
     const library = el('a', '開啟官方遊戲庫（登入後選「已購買」）', panel); library.href = LIBRARY; library.target = '_blank'; library.rel = 'noopener noreferrer';

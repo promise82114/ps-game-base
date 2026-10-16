@@ -193,16 +193,18 @@ test('entry uses recently-purchased while metadata supports the entire library h
 });
 
 test('bridge auto-sync returns whitelisted complete data only to the exact origin', async () => {
-  const {api,messages,calls}=setup([{games:[game(1)]}], 'http://127.0.0.1:4175');
+  for (const origin of ['http://127.0.0.1:4175', 'https://promise82114.github.io']) {
+  const {api,messages,calls}=setup([{games:[game(1)]}], origin);
   authorize(api);
   await new Promise(resolve=>setTimeout(resolve,30));
   assert.equal(calls.length,1);
   const result=messages.find(m=>m.value.type==='PSGB_RESULT');
-  assert.ok(result);assert.equal(result.origin,'http://127.0.0.1:4175');
+  assert.ok(result);assert.equal(result.origin,origin);
   assert.equal(result.value.session,'11111111-1111-4111-8111-111111111111');
   assert.equal(result.value.payload.complete,true);
   assert.ok(!JSON.stringify(messages).includes('test-only'));
   assert.ok(!JSON.stringify(messages).includes('must-not-export'));
+  }
 });
 test('bridge rejects insecure remote origins and never returns partial results', async () => {
   const invalid=setup([{games:[game(1)]}],'http://unsafe.example');authorize(invalid.api);
