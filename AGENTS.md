@@ -1,0 +1,59 @@
+# PS Game Base 協作規則
+
+本文件適用於本 repo 及其子目錄。開始工作先讀本文件、[README.md](README.md) 與 [docs/HANDOFF.md](docs/HANDOFF.md)；獎盃研究另讀 [docs/trophy-probe.md](docs/trophy-probe.md)。先核對實際檔案及 Git 狀態，交接文件是有日期的快照，不能取代現況。
+
+## 工作方式
+
+- 使用繁體中文溝通。使用者說「分析討論」或「先不要修改」時維持唯讀；明確要求修正／調整後，完成必要修改與適當驗證。
+- 優先最小範圍修改，沿用既有事件、儲存格式、CSS 及本機 SVG，不新增不必要的套件或重構。
+- 不把尚未驗證的原因當成結論。清楚區分原始碼、合成測試、瀏覽器操作、外部 API 實測與部署結果。
+- 不覆寫其他工作留下的變更。遇到檔案突然退回舊內容，先看 diff、修改時間、Git 歷史，保留現場；不可用還原／丟棄掩蓋，也不可在沒有證據時歸因特定編輯器或程序。
+- 不因文件提到其他 repo 就一併修改。正式撈取腳本的開發副本位於本 repo 的 `dist/scripts/`，與原始 tampermonkey-scripts repo 分開維護。
+
+## 專案與啟動
+
+- 原生 HTML／CSS／ES modules，`dist/` 就是網頁原始碼與發布目錄，並非可任意刪除重建的產物。沒有 npm 套件依賴與建置步驟。
+- Node.js 20+；`npm start` 或 `node server.mjs` 啟動 `http://127.0.0.1:4175`，`npm test` 或 `node --test tests` 執行測試。PowerShell 不使用未經展開確認的測試檔 glob。
+- `main` 為工作及發布分支；`.github/workflows/deploy.yml` 在推送 main 時發布 `dist/`，手動發布也只允許 main。
+- 本機、localhost、Pages 是不同 origin，localStorage 不共用；改網址或連接埠前需考慮備份、OAuth 授權來源及 userscript 的來源白名單。
+
+## 必須保留的產品與資料規則
+
+- 遊戲庫授權與個人整理分離；匯入或重新同步不得默默刪除個人分類、標籤、筆記。
+- 自動分組依每筆授權的非空 `conceptId` → `productId` → `entitlementId` 選擇單一 key；只有相同 key 才合併，不能依名稱猜測，不能跨不同 concept 或不同層級 key 串接。畫面合併不刪原始授權。
+- 三種分類互斥：白金儲存 `已白金`、追蹤儲存 `想玩`、忽略儲存 `不再遊玩`；清除使用 `未開始`。沿用既有狀態碼與存檔相容性，不自行改欄位或 schema。
+- 白金／追蹤／忽略圖示分別為獎盃／書籤／圓圈叉，選取色為 `#75BDF6`／`#E9AD42`／`#E65B62`，未選取灰階；不降低整個元件 opacity。
+- 圖片滑入顯示三個快捷分類，移出只顯示已選分類；再次點擊已選項可取消，保留鍵盤及觸控操作。
+- 忽略只是標記，預設仍在所有遊戲中，交由篩選器處理。追蹤已取代收藏；不恢復紅心／我的收藏／評分介面。舊 `favorite`、`rating` 僅保留備份相容，不自動轉換分類。
+- 本機 key 為 `ps-game-base.v1`；操作前復原備份為 `ps-game-base.v1.before-import`，只保留最近一份。不得在測試中清除使用者實際來源的 localStorage。
+- JSON／Drive 個人整理先比較再套用，預設合併、本機衝突優先、保留兩端獨有紀錄及分類聯集；整份採用來源需明確選擇。保留復原備份、分頁舊資料寫入保護及可見的操作回饋。
+- Drive 使用 `appDataFolder` 的 `ps-game-base.json`。先讀取版本，再依有效 ETag／If-Match 保護更新；缺少版本、同名多檔或衝突時停止，不降級成無條件覆蓋。API 細節依當前程式與測試，不依舊筆記猜測。
+- 保留 noindex／nofollow 及低調的個人用途設定；這不是網站登入或存取控制。
+
+## 憑證與獎盃研究
+
+- 不將密碼、Cookie、Bearer、NPSSO、授權碼、refresh token、含憑證的 HAR／網址／原始回應寫入文件、測試資料、console、JSON、Drive 或 Git，也不要求使用者貼出這些內容。
+- 使用受限的階段碼、固定主機／路徑、狀態碼與計數診斷，不直接輸出原始例外或標頭。
+- 正式腳本回傳維持 origin、分頁物件與 session 驗證；不將任意來源加入信任，也不使用萬用跨來源權限規避失敗。
+- 獎盃 probe 與正式遊戲庫分開；目前每輪至多 5 個 title ID、3 個獎盃 API 請求，不因單次測試改成全庫掃描或無限重試。
+- 「遊戲有白金」與「帳號已取得白金」分開；未知資料保留 null／unknown，查不到不等於沒有。PS4／PS5 獎盃組分開，不因作品卡合併就加總或平均。
+- 未經新決策，不把獎盃狀態寫回使用者的白金／追蹤／忽略標記。未玩過的已購遊戲能否可靠對應仍需實測。
+- 暫時授權助手只監聽 `127.0.0.1:4176`，僅使用者選擇助手模式才傳送暫存授權資料；保留固定 Sony 上游、nonce、來源檢查、請求上限與逾時。不得暴露到區域網路、發布成公開服務或關閉 TLS 驗證。
+
+## Git、commit 與發布
+
+1. 開始前及提交前檢查 `git status --short --branch`、`git diff`、`git diff --cached`，另檢查未追蹤檔；分清楚本次與既有修改。
+2. 只有使用者要求 commit 時才提交。單純要求修改、整理文件或討論 commit 規則，不代表要求立即提交；同樣地，commit 不代表允許 push。
+3. 使用 main；不要自行切換分支、合併、重設、amend、強制推送或丟棄工作。若現況不在 main，先說明差異再處理。
+4. 明確 `git add` 本次相關路徑，不盲目 `git add .`。先確認沒有私人匯出、憑證、日誌；`.gitignore` 的 `ps-game-base-*.json` 不涵蓋所有其他名稱的私人 JSON。
+5. 適當驗證後提交。訊息沿用 `feat:`／`fix:`／`docs:`／`ci:` 加繁體中文具體描述；避免把無關工作混成一筆。
+6. 提交後立即再查 status、最新 commit 與關鍵 diff；若又出現修改，列出檔案並查證，不宣稱一定乾淨或一定是提交失敗。不要以自動還原消除異常。
+7. 回報 commit hash、摘要、測試結果、剩餘變更與是否 push。只有使用者要求 push 才推送；推送 main 會觸發 Pages，完成後需另看 Actions 才能聲稱部署成功。
+8. 遇到 Windows ownership 的 dubious ownership 時，確認目標後可用 `git -c safe.directory=D:/gitp/ps-game-base ...` 限定單次命令；不要擅自改全域信任設定。換機後路徑依實際 checkout 調整。
+
+## 驗證與交接
+
+- 程式變動執行相關測試；資料模型、匯入／同步或腳本改動通常執行完整 `npm test`。腳本／助手可再用 `node --check` 檢查語法。純文件修改核對連結、指令與 `git diff --check` 即可。
+- UI 變動另檢查真實瀏覽器的滑入／滑出、切換／取消、鍵盤、儲存後重新載入與對話框訊息；以獨立測試來源或合成資料避免污染使用者紀錄。
+- 合成 DOM／mock 成功不等於 Sony、Chrome／Tampermonkey、Google OAuth／Drive 成功；未驗收項目必須列出。
+- 接續工作時更新 `docs/HANDOFF.md` 的日期、HEAD、未提交清單、測試結果、卡點與下一步。私密測試輸出另行保存，不加入 repo。

@@ -2,6 +2,8 @@
 
 本機優先的 PlayStation 遊戲庫管理頁。原生 HTML / CSS / JavaScript，無須安裝 npm 套件，不會自動上傳資料。
 
+換機或接續開發先看 [交接與執行進度](docs/HANDOFF.md)；協作、資料約束與 commit／發布規則見 [AGENTS.md](AGENTS.md)。獎盃研究工具已納入版本管理，仍待真實帳號驗證；換機前請依交接清單另行保存個人備份。
+
 ## 啟動
 
 需要 Node.js 20 或以上。在 PowerShell 執行：
@@ -140,6 +142,10 @@ Google GIS Token Model 在使用者點擊後取得暫存 access token；Drive sc
 
 官方文件：[Token Model](https://developers.google.com/identity/oauth2/web/guides/use-token-model)、[Drive appDataFolder](https://developers.google.com/workspace/drive/api/guides/appdata)、[Drive v2 更新檔案](https://developers.google.com/workspace/drive/api/reference/rest/v2/files/update)。
 
+## 獎盃小範圍測試（獨立腳本）
+
+Chrome／Tampermonkey 測試腳本為 `dist/scripts/ps-game-base-trophy-probe.user.js`，與正式撈取腳本分開，每輪最多 5 個 title ID，重點驗證獎盃總數、有沒有白金及個人取得狀態。可匯出不含憑證的結果，沒有寫入個人分類或 Drive。執行方式、欄位及未玩過遊戲的對應限制見 [測試說明](docs/trophy-probe.md)。目前通過 30 項腳本模擬測試與 8 項本機助手測試，Chrome 實測已確認遊戲清單攔截與 Sony 登入成功，但瀏覽器授權碼重新導向仍失敗；v0.1.5 另提供只監聽 127.0.0.1 的暫時本機授權助手，仍待真實帳號驗證。
+
 ## 驗證
 
 ```powershell
@@ -148,7 +154,7 @@ node --check dist/app.js
 node --check dist/scripts/ps-game-base.user.js
 ```
 
-86 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。作品分組另驗證相同 concept、同名不誤併、跨平台與來源交集篩選、部分授權未出現、舊紀錄保留、作品整理備份往返，以及後續補入版本／concept 的情況；另包含百英雄傳的相同 product 分組、分組優先序、空白 ID、舊授權整理保留與 product → concept 的相容讀取。分類測試涵蓋既有狀態碼、忽略保留在一般清單、明確選取／排除忽略篩選、清除分類、舊狀態保留、停用評分及收藏的相容性。本次新增合併模型與合成 DOM 的實際 app 事件測試，涵蓋本機／來源獨有進度、逐筆衝突、舊授權與作品資料、空白清除、分類聯集、孤立紀錄、預覽取消、復原備份、儲存失敗、其他分頁更新及雲端版本衝突。測試資料全為合成資料，不含私人遊戲庫。
+124 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。作品分組另驗證相同 concept、同名不誤併、跨平台與來源交集篩選、部分授權未出現、舊紀錄保留、作品整理備份往返，以及後續補入版本／concept 的情況；另包含百英雄傳的相同 product 分組、分組優先序、空白 ID、舊授權整理保留與 product → concept 的相容讀取。分類測試涵蓋既有狀態碼、忽略保留在一般清單、明確選取／排除忽略篩選、清除分類、舊狀態保留、停用評分及收藏的相容性。本次新增合併模型與合成 DOM 的實際 app 事件測試，涵蓋本機／來源獨有進度、逐筆衝突、舊授權與作品資料、空白清除、分類聯集、孤立紀錄、預覽取消、復原備份、儲存失敗、其他分頁更新及雲端版本衝突。測試資料全為合成資料，不含私人遊戲庫。
 
 分類 UI 已以獨立本機來源的合成資料驗證：三個 Radio 的互斥、各選取色彩、未選取灰階、鍵盤左右鍵、白金／忽略／追蹤儲存及重新載入、清除分類後重新載入。快捷圖示另驗證圖片移入展開、移出僅顯示已選圖示、未分類不顯示、鍵盤切換後保留焦點、儲存後重新載入、忽略仍在所有遊戲，以及明確篩選只列忽略。
 
