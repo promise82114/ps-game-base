@@ -40,6 +40,37 @@ function setup(initial=fixture()){
  vm.createContext(context);vm.runInContext(source+'\nglobalThis.appTest={preview,getState:()=>state,getPending:()=>pendingImport};',context);
  return {nodes,storage,io,windowEvents,app:context.appTest};
 }
+test('library renders every work beyond the old page size and filters the full result',()=>{
+ const data=fixture('',Array.from({length:125},(_,i)=>String(i).padStart(3,'0')));
+ data.library.games.forEach((g,i)=>{g.platform=i%2?'PS4':'PS5';});
+ const {nodes}=setup(data),grid=nodes.get('grid'),search=nodes.get('search');
+ nodes.get('status').value='';nodes.get('status').listeners.change();
+ const titles=()=>grid.querySelectorAll('button').map(n=>n.textContent);
+ assert.equal(grid.children.length,125);assert.equal(titles().at(-1),'Game 124');
+ assert.match(nodes.get('result-count').textContent,/125 部作品 · 125 筆授權/);
+ nodes.get('platform').value='PS5';nodes.get('platform').listeners.change();
+ assert.equal(grid.children.length,63);assert.equal(titles().at(-1),'Game 124');
+ search.value='Game 124';search.listeners.input();assert.deepEqual(titles(),['Game 124']);
+ search.value='no matching game';search.listeners.input();assert.equal(grid.children.length,0);assert.equal(nodes.get('empty').hidden,false);
+ search.value='';search.listeners.input();assert.equal(grid.children.length,63);
+ nodes.get('platform').value='';nodes.get('platform').listeners.change();assert.equal(grid.children.length,125);
+});
+
+test('select all includes every filtered result and preserves selection across filters',()=>{
+ const data=fixture('',Array.from({length:125},(_,i)=>String(i).padStart(3,'0')));
+ data.library.games.forEach((g,i)=>{g.platform=i%2?'PS4':'PS5';});
+ const {nodes,storage}=setup(data);
+ nodes.get('status').value='';nodes.get('status').listeners.change();
+ nodes.get('platform').value='PS5';nodes.get('platform').listeners.change();nodes.get('select-all').onclick();
+ assert.equal(nodes.get('selected-count').textContent,'已選 63 部作品');
+ nodes.get('platform').value='PS4';nodes.get('platform').listeners.change();nodes.get('select-all').onclick();
+ assert.equal(nodes.get('selected-count').textContent,'已選 125 部作品');
+ nodes.get('batch-status').value='想玩';nodes.get('apply-status').onclick();
+ const saved=JSON.parse(storage.get(KEY));assert.equal(Object.keys(saved.personal.works).length,126);
+ for(const g of data.library.games)assert.equal(saved.personal.works['concept:'+g.conceptId].status,'想玩');
+ nodes.get('clear-selection').onclick();assert.equal(nodes.get('batch').hidden,true);
+});
+
 test('preview and cancel do not write data',()=>{
  const {nodes,storage,app}=setup(),before=storage.get(KEY);nodes.get('data-dialog').showModal();
  app.preview(fixture('cloud'),'test.json');assert.equal(nodes.get('confirm-dialog').open,true);assert.equal(storage.get(KEY),before);assert.equal(storage.has(RECOVERY),false);

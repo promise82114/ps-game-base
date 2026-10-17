@@ -1,6 +1,16 @@
 # 換機交接與執行進度
 
-更新日期：2026-10-17（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
+更新日期：2026-10-18（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
+
+## 2026-10-18 遊戲庫全量顯示
+
+- 移除原本每頁 48 部作品的限制與上一頁／下一頁控制，搜尋、篩選及排序結果全部顯示，可連續向下捲動；封面仍使用原生延遲載入。
+- 「選取全部結果」選取目前符合條件的所有作品，仍可跨篩選保留選取、批次分類與取消選取。
+- 本次提交範圍：`dist/app.js`、`dist/index.html`、`dist/style.css`、`tests/sync-ui.test.mjs`、`README.md`、`docs/HANDOFF.md`。使用者已要求 commit／push；提交後未提交清單與部署結果須以實際 Git／Actions 核對。
+- 新增兩項合成 DOM 回歸測試，涵蓋 125 部作品全量顯示、搜尋／平台篩選、無結果、跨篩選全選及批次儲存。完整測試 **126 項通過，0 失敗**。
+- 本機無可用的 `npm`；Node v24 需展開測試檔名：`$testFiles = @(rg --files tests | Where-Object { $_ -match '\.test\.(mjs|cjs|js)$' }); node --test @testFiles`。沙箱內助手測試因 loopback `EACCES` 失敗，沙箱外完整重跑全部通過。
+- 真實瀏覽器使用獨立來源 `http://127.0.0.1:4177/` 及 1,001 部合成作品，確認卡片全數存在、可捲到最後一部、全選 1,001 部、平台篩選 501 部、搜尋末端作品、無結果提示、快捷分類滑入／移出、選取／再次取消、鍵盤方向鍵、重新載入保留分類及匯入對話框回饋。
+- 卡點與下一步：本次需求已完成；未以私人全庫或手機觸控驗收，外部 Sony／Google 服務不在本次驗證範圍。依使用者指示提交並推送 main，之後檢查 Pages Actions。
 
 ## 先看這裡
 
@@ -14,12 +24,12 @@
 
 | 項目 | 交接時狀態 |
 | --- | --- |
-| 本機 repo | `D:\gitp\ps-game-base` |
+| 本機 repo | `G:\git\ps-game-base` |
 | 分支 | `main` |
-| 交接提交前的基準 HEAD | `91fa0258db995814c8a75c23fb2d6d39a5738038` |
-| 基準提交 | `fix: 修正 Google Drive 同步版本保護資訊取得` |
+| 本次工作基準 HEAD | `8d52872a837a0f8cb27c5abf9f3559bc31f14129` |
+| 基準提交 | `feat: 保存獎盃測試工具與換機交接文件` |
 | origin | `https://github.com/promise82114/ps-game-base.git` |
-| 遠端／部署 | 本次已獲授權提交並推送 main；是否完成以 Git 遠端核對及操作回報為準，部署另看 Actions |
+| 遠端／部署 | 本次已獲授權提交並推送 main；完成與否以 Git／Actions 核對及操作回報為準 |
 
 近期已提交的里程碑：
 

@@ -2,7 +2,7 @@ import {classificationOptions, classificationFor, matchesClassification, library
 import {icon} from './icons.js';
 import {compareImport,resolveImport} from './sync.js';
 const $ = id => document.getElementById(id), KEY = 'ps-game-base.v1';
-let state = {library:{schemaVersion:1,complete:false,syncedAt:null,games:[],missingIds:[]},personal:emptyPersonal()}, view='all', category='', page=1, selected=new Set(), shown=[], pendingImport=null, demo=false;
+let state = {library:{schemaVersion:1,complete:false,syncedAt:null,games:[],missingIds:[]},personal:emptyPersonal()}, view='all', category='', selected=new Set(), shown=[], pendingImport=null, demo=false;
 let bridge=null, bridgeTimer, cloudRead=false, cloudBusy=false, prepared=false;
 let works = new Map();
 function notice(message) {
@@ -36,11 +36,11 @@ function render(){
  $('heading').replaceChildren(el('span',category||names[view]),el('small',' / LIBRARY'));
  for(const b of $('views').querySelectorAll('button')){const active=!category&&b.dataset.view===view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}
  $('categories').replaceChildren();$('batch-category').replaceChildren();option($('batch-category'),'','選擇分類');$('category-filter').replaceChildren();option($('category-filter'),'','全部分類');
- for(const c of state.personal.categories){const b=el('button',`◌　${c}`);b.classList.toggle('active',category===c);b.onclick=()=>{category=c;page=1;render();};$('categories').append(b);option($('batch-category'),c);option($('category-filter'),c);}$('category-filter').value=category;
+ for(const c of state.personal.categories){const b=el('button',`◌　${c}`);b.classList.toggle('active',category===c);b.onclick=()=>{category=c;render();};$('categories').append(b);option($('batch-category'),c);option($('category-filter'),c);}$('category-filter').value=category;
  const search=$('search').value.trim().toLocaleLowerCase();
  const filtered=games.filter(g=>{const r=record(g.key);return (!category||r.categories.includes(category))&&(category||view!=='missing'||g.missingCount>0)&&matchesClassification(r.status,{view,filter:$('status').value,customCategory:!!category})&&(!search||[...g.members.map(m=>m.name),r.note,...r.tags].join(' ').toLocaleLowerCase().includes(search))&&matchesWorkFilters(g,{platform:$('platform').value,membership:$('membership').value,missingOnly:!category&&view==='missing'},state.library.missingIds);});
  filtered.sort((a,b)=>{const x=record(a.key),y=record(b.key);return ($('sort').value==='updated'?y.updatedAt.localeCompare(x.updatedAt):0)||a.name.localeCompare(b.name,'zh-Hant');});
- const pages=Math.max(1,Math.ceil(filtered.length/48));page=Math.min(page,pages);shown=filtered.slice((page-1)*48,page*48);
+ shown=filtered;
  $('grid').replaceChildren();$('empty').hidden=filtered.length>0;
  $('empty').querySelector('h2').textContent=games.length?'沒有符合條件的遊戲':'為你的遊戲，留一個位置。';
  $('empty').querySelector('p').textContent=games.length?'試試其他搜尋字詞、分類或篩選條件。':'匯入撈取腳本產生的 JSON，或開啟官方遊戲庫同步。分類、標籤與遊玩進度，都從這裡開始。';
@@ -59,7 +59,7 @@ function render(){
   if(g.missingCount)body.append(el('p',g.missingCount===g.members.length?'最近完整同步未出現':'部分版本授權於最近完整同步未出現','missing'));
   card.append(body);$('grid').append(card);
  }
- $('result-count').textContent=`${filtered.length} 部作品 · ${filtered.reduce((count,g)=>count+g.members.length,0)} 筆授權${selected.size?' · 已選 '+selected.size+' 部':''}`;$('page-label').textContent=`${page} / ${pages}`;$('prev').disabled=page===1;$('next').disabled=page===pages;renderBatch();$('reset-demo').hidden=!demo;
+ $('result-count').textContent=`${filtered.length} 部作品 · ${filtered.reduce((count,g)=>count+g.members.length,0)} 筆授權${selected.size?' · 已選 '+selected.size+' 部':''}`;renderBatch();$('reset-demo').hidden=!demo;
 }
 function renderBatch(){$('batch').hidden=!selected.size;$('selected-count').textContent=`已選 ${selected.size} 部作品`;}
 function quickClassifications(game,status){
@@ -74,10 +74,9 @@ function quickClassifications(game,status){
  }
  return controls;
 }
-for(const b of $('views').querySelectorAll('button'))b.onclick=()=>{view=b.dataset.view;category='';$('status').value='';page=1;render();};
-$('category-filter').onchange=()=>{category=$('category-filter').value;page=1;render();};
-for(const id of ['search','platform','status','membership','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{page=1;render();});
-$('prev').onclick=()=>{page--;render();};$('next').onclick=()=>{page++;render();};
+for(const b of $('views').querySelectorAll('button'))b.onclick=()=>{view=b.dataset.view;category='';$('status').value='';render();};
+$('category-filter').onchange=()=>{category=$('category-filter').value;render();};
+for(const id of ['search','platform','status','membership','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{render();});
 $('select-all').onclick=()=>{shown.forEach(g=>selected.add(g.key));render();};$('clear-selection').onclick=()=>{selected.clear();render();};
 function batch(fn){for(const id of selected)fn(id);const saved=persist();render();if(saved)notice('已更新選取的遊戲。');}
 $('apply-status').onclick=()=>batch(id=>update(id,{status:$('batch-status').value}));$('apply-category').onclick=()=>{const c=$('batch-category').value;if(c)batch(id=>update(id,{categories:[...new Set([...record(id).categories,c])]}));};
@@ -151,7 +150,7 @@ $('confirm-import').onclick=async()=>{
   if(uploading){cloudBusy=true;renderCloud();await drive.write(value,pending.expected);uploaded=true;cloudRead=false;}
   if(externalChanged)throw Error('另一分頁已更新資料，本頁未覆寫本機。請重新整理後再比較。');
   if(!demo){try{localStorage.setItem(KEY,JSON.stringify(next));}catch{throw Error('本機儲存失敗，原本機進度仍保留；請釋放空間後重試。');}}
-  state=next;storageFailed=false;selected.clear();category='';page=1;render();$('confirm-dialog').close();
+  state=next;storageFailed=false;selected.clear();category='';render();$('confirm-dialog').close();
   notice(uploading?'合併結果已上傳並保存在本機。可匯出上次操作前備份。':'已依比較結果套用；可在資料與同步匯出上次操作前備份。');
  }catch(e){notice((uploaded?'雲端已上傳，但本機未套用。':'')+e.message);}
  finally{pending.applying=false;for(const b of buttons)b.disabled=false;if(pendingImport)updateImportEffect();if(uploading){cloudBusy=false;renderCloud();}}
