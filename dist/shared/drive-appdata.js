@@ -2,6 +2,7 @@
 (function(global){
  'use strict';
  class DriveError extends Error {constructor(message,code='drive'){super(message);this.code=code;}}
+ const sameVersion=(a,b)=>!!a&&!!b&&typeof a.id==='string'&&!!a.id&&a.id===b.id&&typeof a.version==='string'&&/^\d+$/.test(a.version)&&a.version===b.version;
  class DriveAppData {
   constructor(auth,fileName){this.auth=auth;this.fileName=fileName;}
   async request(url,options={}){
@@ -29,23 +30,28 @@
    if(files.length>1)throw new DriveError('雲端有多份同名進度，已停止操作以避免覆蓋。請先處理重複檔案。','duplicate');
    return files[0]||null;
   }
-  async metadata(id){return this.json(await this.request('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?fields=id,name,version,modifiedTime,size'));}
+  async metadata(id){
+   // v2 exposes the file resource ETag in JSON; media response headers may be
+   // absent or hidden by CORS. Use the same API version for conditional updates.
+   const file=this.json(await this.request('https://www.googleapis.com/drive/v2/files/'+encodeURIComponent(id)+'?fields=id,title,version,modifiedDate,fileSize,etag'));
+   return {id:file.id,name:file.title,version:file.version,modifiedTime:file.modifiedDate,size:file.fileSize,etag:file.etag};
+  }
   async read(){
    const file=await this.find();if(!file)return null;
    if(Number(file.size)>5*1024*1024)throw new DriveError('雲端進度超過 5 MB，已停止下載。','invalid');
    const media=await this.request('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(file.id)+'?alt=media');
    if(media.text.length>5*1024*1024)throw new DriveError('雲端进度檔案太大。','invalid');
    const latest=await this.metadata(file.id);
-   if(latest.version!==file.version)throw new DriveError('下載期間雲端已變更，請再下載一次。','conflict');
-   return {file:latest,etag:media.etag,value:this.json(media)};
+   if(!sameVersion(latest,file))throw new DriveError('下載期間雲端已變更，請再下載一次。','conflict');
+   return {file:latest,etag:latest.etag,value:this.json(media)};
   }
   async write(value,expected){
    const current=await this.find();
-   if(expected?(!current||current.id!==expected.file.id||current.version!==expected.file.version):!!current)throw new DriveError('雲端進度已變更，請重新下載比較後再操作。','conflict');
+   if(expected?!sameVersion(current,expected.file):!!current)throw new DriveError('雲端進度已變更，請重新下載比較後再操作。','conflict');
    const body=JSON.stringify(value);
    if(current){
-    if(!expected.etag)throw new DriveError('無法取得雲端版本保護資訊，已暫停同步以避免覆蓋。','invalid');
-    await this.request('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(current.id)+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json',...(expected.etag?{'If-Match':expected.etag}:{})},body});
+    if(typeof expected.etag!=='string'||!/^"[\x21\x23-\x7e\x80-\xff]*"$/.test(expected.etag))throw new DriveError('無法取得雲端版本保護資訊，已暫停同步以避免覆蓋。','invalid');
+    await this.request('https://www.googleapis.com/upload/drive/v2/files/'+encodeURIComponent(current.id)+'?uploadType=media',{method:'PUT',headers:{'Content-Type':'application/json','If-Match':expected.etag},body});
    }else{
     const boundary='sideproject_'+crypto.randomUUID().replaceAll('-','');
     const metadata={name:this.fileName,mimeType:'application/json',parents:['appDataFolder']};

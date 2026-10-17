@@ -136,7 +136,9 @@ Google GIS Token Model 在使用者點擊後取得暫存 access token；Drive sc
 
 操作為「載入授權服務 → 再次點擊連接 → 下載並比較／比較並上傳 → 確認差異」。下載只開啟比較，不直接取代本機；上傳會重新讀取雲端，顯示與 JSON 匯入相同的差異和衝突選擇，確認後才將合併結果寫到雲端及本機。上傳失敗時本機維持原狀；若雲端成功但本機儲存失敗，會分別提示結果。上傳前必須先讀取版本；檔案版本、ETag / If-Match 保護更新，衝突時停止。同名多份檔案也會停止。斷線只清除本分頁 token，不刪除雲端備份，亦不撤銷 Google 帳號的既有授權。
 
-官方文件：[Token Model](https://developers.google.com/identity/oauth2/web/guides/use-token-model)、[Drive appDataFolder](https://developers.google.com/workspace/drive/api/guides/appdata)。
+版本保護從 [Drive v2 檔案中繼資料的 JSON `etag`](https://developers.google.com/workspace/drive/api/reference/rest/v2/files) 取得，不依賴檔案下載回應的 ETag 標頭；受保護更新使用同版 API 的 `PUT` 搭配 `If-Match`。查詢、下載內容與首次建立仍使用 v3。若缺少有效版本或 ETag，仍停止上傳；下載期間變更及上傳時 HTTP 412 也會阻止覆蓋。`tests/drive-appdata.test.mjs` 模擬這些情境，未代替真實 Google 帳號讀寫驗收。
+
+官方文件：[Token Model](https://developers.google.com/identity/oauth2/web/guides/use-token-model)、[Drive appDataFolder](https://developers.google.com/workspace/drive/api/guides/appdata)、[Drive v2 更新檔案](https://developers.google.com/workspace/drive/api/reference/rest/v2/files/update)。
 
 ## 驗證
 
@@ -146,7 +148,7 @@ node --check dist/app.js
 node --check dist/scripts/ps-game-base.user.js
 ```
 
-74 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。作品分組另驗證相同 concept、同名不誤併、跨平台與來源交集篩選、部分授權未出現、舊紀錄保留、作品整理備份往返，以及後續補入版本／concept 的情況；另包含百英雄傳的相同 product 分組、分組優先序、空白 ID、舊授權整理保留與 product → concept 的相容讀取。分類測試涵蓋既有狀態碼、忽略保留在一般清單、明確選取／排除忽略篩選、清除分類、舊狀態保留、停用評分及收藏的相容性。本次新增合併模型與合成 DOM 的實際 app 事件測試，涵蓋本機／來源獨有進度、逐筆衝突、舊授權與作品資料、空白清除、分類聯集、孤立紀錄、預覽取消、復原備份、儲存失敗、其他分頁更新及雲端版本衝突。測試資料全為合成資料，不含私人遊戲庫。
+86 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。作品分組另驗證相同 concept、同名不誤併、跨平台與來源交集篩選、部分授權未出現、舊紀錄保留、作品整理備份往返，以及後續補入版本／concept 的情況；另包含百英雄傳的相同 product 分組、分組優先序、空白 ID、舊授權整理保留與 product → concept 的相容讀取。分類測試涵蓋既有狀態碼、忽略保留在一般清單、明確選取／排除忽略篩選、清除分類、舊狀態保留、停用評分及收藏的相容性。本次新增合併模型與合成 DOM 的實際 app 事件測試，涵蓋本機／來源獨有進度、逐筆衝突、舊授權與作品資料、空白清除、分類聯集、孤立紀錄、預覽取消、復原備份、儲存失敗、其他分頁更新及雲端版本衝突。測試資料全為合成資料，不含私人遊戲庫。
 
 分類 UI 已以獨立本機來源的合成資料驗證：三個 Radio 的互斥、各選取色彩、未選取灰階、鍵盤左右鍵、白金／忽略／追蹤儲存及重新載入、清除分類後重新載入。快捷圖示另驗證圖片移入展開、移出僅顯示已選圖示、未分類不顯示、鍵盤切換後保留焦點、儲存後重新載入、忽略仍在所有遊戲，以及明確篩選只列忽略。
 
