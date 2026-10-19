@@ -2,6 +2,12 @@
 
 更新日期：2026-10-19（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
 
+## 2026-10-19 商品卡片 PS PLUS 圖標
+
+- 基準 HEAD `b5a564b`，main；開始時工作樹乾淨。使用者已要求 commit & push，提交範圍為 `dist/app.js`、`dist/icons.js`、`dist/style.css`、`tests/sync-ui.test.mjs` 與本文件；提交、遠端同步與 Pages 部署結果依實際 Git／Actions 核對。
+- 商品卡片右下角只在任一版本授權為 `PS_PLUS` 時顯示金色十字 SVG，含 PLUS／非 PLUS 混合的作品也顯示一個圖標；非 PLUS／未知來源留白，不再顯示「多種授權」。保留圖標的 PS PLUS accessible name／title、版本明細、來源篩選與原始授權資料。
+- 完整 Node 測試 176 項通過，包含四種來源情境與混合卡片在非 PLUS 篩選下仍顯示圖標；語法與差異檢查通過。獨立 `127.0.0.1:4177` 真實瀏覽器使用 5 筆合成授權／4 張卡片，確認右下角金色圖標、非 PLUS 留白及重新載入。未使用私人資料，未驗收手機版或線上部署；沒有本次外部 API 變更或卡點。臨時測試頁與服務於驗證後清除。
+
 ## 2026-10-19 v0.4.5 提交範圍與驗證
 
 - 使用者已要求 commit & push。本次提交整合 v0.4.3 至 v0.4.5 的免助手研究、成功的 sso_token 正式授權、單筆診斷、操作提示、資源版號及交接文件；基準 HEAD `a6c00c2`，main。提交 hash 與遠端是否同步以實際 Git 紀錄為準，下方各階段「未 commit／push」為當時快照。

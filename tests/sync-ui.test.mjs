@@ -67,6 +67,24 @@ test('library renders every work beyond the old page size and filters the full r
  nodes.get('platform').value='';nodes.get('platform').listeners.change();assert.equal(grid.children.length,125);
 });
 
+test('cards show a Plus icon for any Plus entitlement and omit other membership labels',()=>{
+ const data=fixture('',[]);
+ data.library.games=[['owned','NONE'],['unknown',''],['plus','PS_PLUS'],['mixed','NONE'],['mixed','PS_PLUS']].map(([conceptId,membership],i)=>({name:conceptId,entitlementId:String(i),conceptId,membership,platform:i===4?'PS4':'PS5'}));
+ const before=JSON.stringify(data),{nodes,storage}=setup(data);
+ nodes.get('status').value='';nodes.get('status').listeners.change();
+ const cards=()=>nodes.get('grid').children.map(card=>({name:card.querySelectorAll('button')[0].textContent,meta:card.children[1].children.find(n=>n.className==='card-meta')}));
+ assert.equal(cards().length,4);
+ for(const {name,meta} of cards()){
+  const badges=meta.children.filter(n=>n.className==='ps-plus-badge');
+  assert.equal(badges.length,['plus','mixed'].includes(name)?1:0,name);
+  assert.ok(meta.children.every(n=>!['非 PS Plus','來源未分類','多種授權','PS Plus'].includes(n.textContent)));
+  if(badges.length){assert.equal(badges[0]['aria-label'],'PS PLUS');assert.equal(badges[0].children[0].tag,'svg');}
+ }
+ nodes.get('membership').value='NONE';nodes.get('membership').listeners.change();
+ assert.equal(cards().find(card=>card.name==='mixed').meta.children.at(-1).className,'ps-plus-badge');
+ assert.equal(storage.get(KEY),before);
+});
+
 test('select all includes every filtered result and preserves selection across filters',()=>{
  const data=fixture('',Array.from({length:125},(_,i)=>String(i).padStart(3,'0')));
  data.library.games.forEach((g,i)=>{g.platform=i%2?'PS4':'PS5';});

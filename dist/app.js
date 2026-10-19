@@ -58,9 +58,10 @@ function render(){
   art.append(quickClassifications(g,r.status));
   const badge=el('span',g.platforms.join(' · ')||'PS','platform-badge');art.append(badge);card.append(art);
   const body=el('div',undefined,'card-body'),title=el('button',g.name,'game-title');title.onclick=()=>edit(g);body.append(title);
-  const memberships=[...new Set(g.members.map(m=>m.membership==='PS_PLUS'?'PS Plus':m.membership==='NONE'?'非 PS Plus':'來源未分類'))];
   const item=classificationFor(r.status),pill=el('span',undefined,'status-pill');if(item){pill.dataset.tone=item.tone;pill.append(icon(item.icon),document.createTextNode(item.label));}else pill.textContent='未分類';
-  const line=el('div',undefined,'card-meta');line.append(pill,el('span',memberships.length>1?'多種授權':memberships[0]));body.append(line);
+  const line=el('div',undefined,'card-meta');line.append(pill);
+  if(g.members.some(m=>m.membership==='PS_PLUS')){const plus=el('span',undefined,'ps-plus-badge');plus.title='PS PLUS';plus.setAttribute('role','img');plus.setAttribute('aria-label','PS PLUS');plus.append(icon('ps-plus'));line.append(plus);}
+  body.append(line);
   if(r.categories.length||r.tags.length)body.append(el('p',[...r.categories,...r.tags.map(t=>'#'+t)].join(' · '),'tags'));
   if(g.missingCount)body.append(el('p',g.missingCount===g.members.length?'最近完整同步未出現':'部分版本授權於最近完整同步未出現','missing'));
   card.append(body);$('grid').append(card);
