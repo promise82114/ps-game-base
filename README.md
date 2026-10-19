@@ -22,7 +22,7 @@ npm start
 - 推送到 `main` 時自動發布；也可在 Actions 手動執行。手動選擇其他分支時會跳過部署。
 - GitHub repo 的 Settings → Pages → Build and deployment → Source 須選擇 **GitHub Actions**。
 - 此 repo 的預設 Pages 網址為 `https://promise82114.github.io/ps-game-base/`；實際發布網址以 Actions 的部署結果為準。
-- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的腳本至 0.2.3。
+- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的整合腳本至 0.4.1。
 - Google OAuth Client 的「已授權 JavaScript 來源」須加入 `https://promise82114.github.io`（僅 origin，不含 `/ps-game-base/`）。此設定需由 Google Cloud 管理者操作。
 - 本機與 Pages 的瀏覽器存檔分開；可透過完整 JSON 備份搬移。
 - 與 EDF 相同，首頁設定 `<meta name="robots" content="noindex, nofollow">`，要求支援此規則的搜尋引擎不要收錄。這不是存取控制，知道公開網址的人仍可開啟網站；個人匯入資料不隨靜態網站發布。參考 [Google noindex 說明](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
@@ -31,7 +31,7 @@ npm start
 
 ## 使用
 
-1. 按「匯入 JSON」，選擇既有撈取腳本產生的 JSON，先看筆數與完整性，再確認匯入。
+1. 按右上角「資料與同步 → 匯入 JSON」，選擇既有撈取腳本產生的 JSON，先看筆數與完整性，再確認匯入。
 2. 圖片區塊右上角可直接選擇白金／追蹤／忽略；點遊戲名稱可編輯自訂分類、標籤與私人筆記，也可清除項目分類。
 3. 側欄可篩選白金、忽略、追蹤與自訂分類；手機版使用分類下拉選單。忽略只是一般標記，不會自動從所有遊戲、自訂分類或搜尋結果中排除，是否顯示由使用者篩選決定。項目分類篩選器另提供「排除忽略」，預設不啟用，也不會變更儲存的標記。
 4. 遊戲庫一次顯示所有符合搜尋與篩選的作品，可直接向下捲動，封面圖片延遲載入。勾選遊戲或「選取全部結果」，可跨篩選保留選取，再批次變更狀態或加入自訂分類。
@@ -41,11 +41,11 @@ npm start
 
 ## 分頁撈取更新
 
-開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.2.3，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
+開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.4.1，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
 
 1. 先在 Chrome / Edge 安裝 Tampermonkey。
 2. 在頁面的「資料與同步」點「安裝 / 更新 Tampermonkey 腳本」，或將副本內容貼入 Tampermonkey 新腳本。
-3. 回到管理頁按「更新遊戲庫」，保留管理頁開啟；官方遊戲庫會另開分頁。
+3. 回到管理頁，從右上角「資料與同步」按「更新遊戲庫」，保留管理頁開啟；官方遊戲庫會另開分頁。
 4. 登入並選「已購買」。腳本在觀察到官方 `getPurchasedGameList` 查詢後，自動循序撈取，完成後回傳管理頁供預覽、確認匯入。
 5. 若瀏覽器／官方登入跳轉使 opener 或網址片段失效，五分鐘後會提示。可在官方分頁開啟 PS Game Base 面板，手動同步、匯出 JSON 再匯入。
 
@@ -57,7 +57,7 @@ npm start
 
 0.2.2 完整補回原版 0.1.3 的 `parsePayload` 與解析階段診斷。保留 `/recently-purchased`、JSON／批次 GraphQL、URL-encoded POST、Request 複本、無 Bearer 工作階段與管理頁回傳流程。修正 0.2.1 漏掉的「網址參數與表單本文合併」：例如操作名稱在網址、extensions 在表單時，現在可取得查詢碼；表單欄位優先於同名網址欄位。這個缺口已用合成請求重現並修正，但不能斷定使用者截圖的所有格式錯誤都由此造成。
 
-更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.2.3；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
+更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.4.1；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
 
 請提供診斷列與面板提示即可，不要提供 Cookie、Bearer、NPSSO 或含授權標頭的 HAR。Sony 真實登入後的同步與分頁回傳仍須實機驗收。
 
@@ -144,15 +144,17 @@ Google GIS Token Model 在使用者點擊後取得暫存 access token；Drive sc
 
 官方文件：[Token Model](https://developers.google.com/identity/oauth2/web/guides/use-token-model)、[Drive appDataFolder](https://developers.google.com/workspace/drive/api/guides/appdata)、[Drive v2 更新檔案](https://developers.google.com/workspace/drive/api/reference/rest/v2/files/update)。
 
-## 獎盃小範圍測試（獨立腳本）
+## 獎盃小範圍測試（整合腳本內的選用工具）
 
-Chrome／Tampermonkey 腳本為 `dist/scripts/ps-game-base-trophy-probe.user.js`，目前 v0.2.1，與正式數位庫撈取腳本分開。直接開啟官方頁面時，維持每輪最多 5 個 title ID 的研究模式，可匯出不含憑證的摘要，不寫個人分類或 Drive。v0.1.5 本機助手模式已有真實帳號成功結果；瀏覽器直接交換授權的路徑仍未驗證成功。詳細說明見 [獎盃測試與白金同步](docs/trophy-probe.md)。
+遊戲庫與白金功能已合併為 `dist/scripts/ps-game-base.user.js` v0.4.1，只需安裝這支。若先前安裝過「PS Game Base 獎盃小範圍測試」，請停用或移除舊腳本，避免重複攔截與面板。安裝時保留原遊戲庫腳本的名稱及 namespace，支援原腳本更新。
+
+一般官方分頁只顯示遊戲庫入口；由該面板點「獎盃研究工具」才展開研究模式，可返回遊戲庫。每輪手動研究仍最多 5 個 title ID，不寫分類或 Drive。獎盃 API 只有點擊研究／白金操作才查詢。詳細說明見 [獎盃測試與白金同步](docs/trophy-probe.md)。
 
 ## 同步白金標記
 
-1. 在「資料與同步」安裝／更新**白金同步腳本 v0.2.1**（沿用原獎盃測試腳本，不需重裝數位庫腳本），儲存後重新開啟官方分頁。
-2. 在與 Chrome 相同的電腦、repo 目錄執行 `node tools/trophy-auth-helper.mjs`。助手只監聽 `127.0.0.1:4176`，15 分鐘後停止接收連線；這是目前必要的執行條件，Pages 不會代為啟動。
-3. 回遊戲庫按「同步白金標記」。此時才另開官方分頁、取得授權，依本次庫版本循序查詢，每批最多 5 個 title ID。平常開頁面、搜尋或更新數位庫不會觸發獎盃查詢。
+1. 在右上角「資料與同步」第一欄安裝／更新**整合腳本 v0.4.1**，停用舊的獨立獎盃腳本，儲存後重新開啟官方分頁。
+2. 確認同一個 Chrome 已登入官方遊戲庫。v0.4.1 改由整合腳本直接向 Sony 交換暫存授權，不連線本機助手、不要求開啟 PowerShell。這次 Cookie 傳遞修正仍待 Chrome 實機驗收，不能把合成測試視為已解決先前的 network／408。
+3. 回遊戲庫，在「資料與同步 → 更新與同步」按「同步白金標記」。此時才另開官方分頁、取得授權，依本次庫版本查詢，每批最多 5 個 title ID、兩批並行且無額外間隔。平常開頁面、搜尋或更新數位庫不會觸發獎盃查詢。
 4. 確認任一已知 PS4／PS5 版本的 `earnedTrophies.platinum` 是正整數，就將對應作品設為既有的 `已白金`。只判斷帳號已取得白金，不以遊戲設有白金或總進度判斷。原本追蹤／忽略會由白金取代；已白金的作品略過。
 
 範圍以現有數位授權庫為準，排除整部作品只剩最近完整同步未出現／明確 `isActive: false` 的授權；不從帳號獎盃清單新增實體版或其他庫外遊戲。有效作品可用同組已知的歷史 PS4／PS5 版本識別白金。權限新鮮度取決於最近數位庫同步；本功能不重新判斷商品是否 DLC 或查會員目錄，也不改動既有庫的顯示／篩選。
@@ -160,6 +162,12 @@ Chrome／Tampermonkey 腳本為 `dist/scripts/ps-game-base-trophy-probe.user.js`
 未對應、沒有已取得白金的資料均不處理；既有白金不撤回。不新增獎盃數量／進度欄位，不修改原始遊戲、個人分類、標籤、筆記、舊紀錄或雲端。成功變更只更新作品狀態及整理時間，沿用操作前備份。中途連線／授權／格式錯誤或取消時不套用本次結果；HTTP 404 的批次視為未對應略過。儲存／備份失敗或偵測其他分頁更新也不覆寫本機。完成訊息顯示新增白金作品數。
 
 官方分頁只回傳本次確認白金的 title ID；管理頁核對 origin、分頁物件、隨機 session 及本次查詢 ID。憑證不會回傳或寫入備份。同步不依名稱配對；尚無可靠 ID 對應的版本會保留原標記。
+
+## 獎盃容量與速度測試
+
+更新整合腳本至 v0.4.1，由官方遊戲庫面板展開「獎盃研究工具」，取得至少 15 個候選後，按「測試容量與分批速度（本機助手）」。最多取前 30 個，實送單次 5／10／15 個，並比較每批 5 個的 350ms／零間隔／2 或 3 批並行。最多 26 個獎盃請求，記錄 HTTP、成功率、耗時、基準一致性與 1,800 個版本的粗估；不是全庫測試。限流／授權失效即停止，不重試。
+
+測試不修改白金、任何存檔或正式同步速度；需同電腦助手。完成可匯出 `ps-game-base-trophy-benchmark-年月日_時-分.json`。詳見 [容量與速度測試說明](docs/trophy-probe.md#v030容量與分批速度實測)。
 
 ## 驗證
 
@@ -171,7 +179,7 @@ node --check dist/app.js
 node --check dist/scripts/ps-game-base.user.js
 ```
 
-141 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。作品分組另驗證相同 concept、同名不誤併、跨平台與來源交集篩選、部分授權未出現、舊紀錄保留、作品整理備份往返，以及後續補入版本／concept 的情況；另包含百英雄傳的相同 product 分組、分組優先序、空白 ID、舊授權整理保留與 product → concept 的相容讀取。分類測試涵蓋既有狀態碼、忽略保留在一般清單、明確選取／排除忽略篩選、清除分類、舊狀態保留、停用評分及收藏的相容性。本次新增合併模型與合成 DOM 的實際 app 事件測試，涵蓋本機／來源獨有進度、逐筆衝突、舊授權與作品資料、空白清除、分類聯集、孤立紀錄、預覽取消、復原備份、儲存失敗、其他分頁更新及雲端版本衝突。測試資料全為合成資料，不含私人遊戲庫。
+147 項 Node 測試：原撈取測試、匯入白名單、重複 ID、個人資料格式、完整／部分結果、缺少項目保留、備份往返、原型特殊 key、分頁自動同步及回傳來源限制；另涵蓋混合網址／表單參數、fetch／XHR 攔截、診斷階段與敏感資料排除，以及混合格式只觸發一次完整回傳。作品分組另驗證相同 concept、同名不誤併、跨平台與來源交集篩選、部分授權未出現、舊紀錄保留、作品整理備份往返，以及後續補入版本／concept 的情況；另包含百英雄傳的相同 product 分組、分組優先序、空白 ID、舊授權整理保留與 product → concept 的相容讀取。分類測試涵蓋既有狀態碼、忽略保留在一般清單、明確選取／排除忽略篩選、清除分類、舊狀態保留、停用評分及收藏的相容性。本次新增合併模型與合成 DOM 的實際 app 事件測試，涵蓋本機／來源獨有進度、逐筆衝突、舊授權與作品資料、空白清除、分類聯集、孤立紀錄、預覽取消、復原備份、儲存失敗、其他分頁更新及雲端版本衝突。測試資料全為合成資料，不含私人遊戲庫。
 
 分類 UI 已以獨立本機來源的合成資料驗證：三個 Radio 的互斥、各選取色彩、未選取灰階、鍵盤左右鍵、白金／忽略／追蹤儲存及重新載入、清除分類後重新載入。快捷圖示另驗證圖片移入展開、移出僅顯示已選圖示、未分類不顯示、鍵盤切換後保留焦點、儲存後重新載入、忽略仍在所有遊戲，以及明確篩選只列忽略。
 
@@ -182,3 +190,21 @@ node --check dist/scripts/ps-game-base.user.js
 ## 來源與授權
 
 撈取查詢與分頁原先參考 psn-mcp，Copyright (c) 2026 TMRP，MIT。保留副本中的來源註解與 `dist/scripts/LICENSE`。
+
+
+### 2026-10-19 實測與正式設定
+
+使用者提供的 v0.3.0 報告完整測試 24 個版本：單次 10／15 個均 HTTP 400；每批 5 個的四種速度設定均完整成功且結果一致，未出現 429。循序 350ms 為 4.003 秒、循序零間隔 2.480 秒、兩批並行 1.822 秒、三批並行 1.892 秒。
+
+v0.4.0 正式白金同步採每批 5 個、兩批並行、零間隔。約 1,800 個版本粗估由 5 分 11 秒縮短至約 1 分 59 秒；這是短測平均延遲推估，未驗證全庫長時間吞吐。完成進度依實際已結束的批次累加；429／401／403、格式／網路失敗立即停止派送後續批次，等待至多兩個在途請求結束，不重試，也不套用部分標記。取消會中止在途請求。
+
+「資料與同步」集中於頁面右上角，面板依序為腳本資訊、更新與同步、匯入與匯出、Google Drive；既有比較、備份與儲存規則保留。
+
+
+### v0.4.1：免助手的直接授權修正（待 Chrome 驗收）
+
+先前直接模式取得 NPSSO 後，授權請求僅依賴瀏覽器 Cookie jar；成功的 Node 助手會明確傳送 NPSSO。新版使用 Tampermonkey `GM_xmlhttpRequest` 的 `cookie` 選項，僅在固定 Sony 授權碼端點傳送 `npsso`，以 manual redirect 取得嚴格驗證的 app callback code，再交換暫存 token。token 交換也不自動跟隨重新導向。這是依據來源實作與管理器介面的修正，尚未證明先前失敗就是 Cookie 傳遞造成。
+
+正式「同步白金標記」不再呼叫 127.0.0.1:4176，也不在失敗時自動改用助手；失敗停止且不套用標記，官方白金面板可匯出不含憑證的授權診斷。每批 5 個、兩批並行、補標及備份規則保留。舊助手工具與研究模式的明確助手按鈕保留供比對；容量／速度研究按鈕目前仍使用助手，與正式白金按鈕不同。
+
+參考 [Tampermonkey GM_xmlhttpRequest 文件](https://www.tampermonkey.net/documentation.php?ext=d2&q=GM_xmlhttpRequest) 的 cookie／redirect 選項，以及 [psn-api 授權碼交換原始碼](https://github.com/achievements-app/psn-api/blob/main/src/authenticate/exchangeNpssoForAccessCode.ts)。

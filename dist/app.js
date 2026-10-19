@@ -90,7 +90,6 @@ function edit(g){const r=record(g.key);$('edit-name').textContent=g.name;$('edit
 $('edit-form').onsubmit=e=>{e.preventDefault();const tags=[...new Set($('edit-tags').value.split(/[,，]/).map(t=>t.trim()).filter(Boolean))];if(tags.some(t=>t.length>100))return notice('每個標籤最多 100 字。');update($('edit-id').value,{status:$('edit-status').value,note:$('edit-note').value,tags,categories:[...$('edit-categories').querySelectorAll('input:checked')].map(n=>n.value)});persist();$('editor').close();render();};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $('settings').onclick=()=>$('data-dialog').showModal();
-$('mobile-settings').onclick=()=>$('data-dialog').showModal();
 $('mobile-categories').onclick=()=>{renderCategories();$('category-dialog').showModal();};
 function renderCategories(){$('category-list').replaceChildren();for(const c of state.personal.categories){const row=el('div',undefined,'category-row'),name=el('span',c),rename=el('button','重新命名'),remove=el('button','刪除');rename.onclick=()=>{const next=prompt('新分類名稱',c)?.trim();if(!next||next===c)return;if(next.length>100||state.personal.categories.includes(next))return notice('名稱過長或已存在。');state.personal.categories=state.personal.categories.map(x=>x===c?next:x);for(const r of [...Object.values(state.personal.records),...Object.values(state.personal.works)])r.categories=r.categories.map(x=>x===c?next:x);if(category===c)category=next;persist();renderCategories();render();};remove.onclick=()=>{if(!confirm(`刪除「${c}」分類？遊戲及其他整理紀錄會保留。`))return;state.personal.categories=state.personal.categories.filter(x=>x!==c);for(const r of [...Object.values(state.personal.records),...Object.values(state.personal.works)])r.categories=r.categories.filter(x=>x!==c);if(category===c)category='';persist();renderCategories();render();};row.append(name,rename,remove);$('category-list').append(row);}}
 $('manage-categories').onclick=()=>{renderCategories();$('category-dialog').showModal();};$('category-form').onsubmit=e=>{e.preventDefault();const c=$('category-name').value.trim();if(!c||state.personal.categories.includes(c))return notice('分類名稱不可空白或重複。');state.personal.categories.push(c);$('category-name').value='';persist();renderCategories();render();};
@@ -137,7 +136,8 @@ $('export-incoming').onclick=()=>{if(!pendingImport)return;const {data}=pendingI
 for(const [id,value] of [['choose-local','local'],['choose-incoming','incoming']])$(id).onclick=()=>{if(!pendingImport)return;for(const select of $('personal-differences').querySelectorAll('select')){select.value=value;pendingImport.choices[select.dataset.rowId]=value;}updateImportEffect();};
 $('confirm-dialog').addEventListener('cancel',e=>{if(pendingImport?.applying)e.preventDefault();});
 $('confirm-dialog').addEventListener('close',()=>{pendingImport=null;});
-$('import').onclick=$('empty-import').onclick=()=>$('file').click();$('file').onchange=async()=>{try{const file=$('file').files[0];if(!file)return;if(file.size>5*1024*1024)throw Error('JSON 檔案上限為 5 MB。');preview(parseImport(JSON.parse(await file.text())),file.name);}catch(e){notice('匯入失敗：'+e.message);}finally{$('file').value='';}};
+$('empty-import').onclick=()=>$('data-dialog').showModal();
+$('import').onclick=()=>$('file').click();$('file').onchange=async()=>{try{const file=$('file').files[0];if(!file)return;if(file.size>5*1024*1024)throw Error('JSON 檔案上限為 5 MB。');preview(parseImport(JSON.parse(await file.text())),file.name);}catch(e){notice('匯入失敗：'+e.message);}finally{$('file').value='';}};
 const RECOVERY_KEY=KEY+'.before-import';
 function saveRecovery(){if(demo)return;localStorage.setItem(RECOVERY_KEY,JSON.stringify(backup()));$('export-recovery').disabled=false;}
 try{$('export-recovery').disabled=!localStorage.getItem(RECOVERY_KEY);}catch{}
@@ -177,7 +177,7 @@ $('sync-platinum').onclick=()=>{
 };
 function setPlatinumBusy(busy){$('sync-platinum').disabled=busy;$('sync-platinum').textContent=busy?'白金同步中…':'同步白金標記';}
 function finishPlatinum(){clearTimeout(platinumTimer);platinumBridge=null;setPlatinumBusy(false);}
-function waitPlatinum(){clearTimeout(platinumTimer);platinumTimer=setTimeout(()=>{try{platinumBridge?.child.postMessage({type:'PSGB_PLATINUM_CANCEL',session:platinumBridge.session},'https://library.playstation.com');}catch{}finishPlatinum();notice('白金同步等待逾時，未變更標記。請確認腳本已更新與本機助手已啟動，再重新點擊同步。');},300000);}
+function waitPlatinum(){clearTimeout(platinumTimer);platinumTimer=setTimeout(()=>{try{platinumBridge?.child.postMessage({type:'PSGB_PLATINUM_CANCEL',session:platinumBridge.session},'https://library.playstation.com');}catch{}finishPlatinum();notice('白金同步等待逾時，未變更標記。請確認整合腳本已更新、官方分頁已登入，再重新點擊同步。');},300000);}
 window.addEventListener('message',event=>{
  const pending=platinumBridge,msg=event.data;
  if(!pending||event.origin!=='https://library.playstation.com'||event.source!==pending.child||msg?.session!==pending.session)return;
@@ -188,7 +188,7 @@ window.addEventListener('message',event=>{
   if(!Number.isInteger(msg.checked)||msg.checked<0||msg.checked>pending.titleIds.length)return;
   waitPlatinum();notice(`白金同步中：已檢查 ${msg.checked} / ${pending.titleIds.length} 個版本…`);
  }else if(msg.type==='PSGB_PLATINUM_ERROR'){
-  finishPlatinum();notice(msg.code==='helper'?'本機獎盃助手未連線，未變更標記。請啟動 tools/trophy-auth-helper.mjs（15 分鐘後停止接收連線）再重試。':msg.code==='cancelled'?'白金同步已取消，未變更標記。':'白金同步未完成，未變更標記。請查看官方分頁提示後重試。');
+  finishPlatinum();notice(msg.code==='helper'?'本機獎盃助手未連線，未變更標記。請啟動 tools/trophy-auth-helper.mjs（15 分鐘後停止接收連線）再重試。':msg.code==='auth'?'瀏覽器授權尚未完成，未變更標記。請在官方分頁確認 Sony 已登入；仍失敗時可在該面板匯出授權診斷。':msg.code==='cancelled'?'白金同步已取消，未變更標記。':'白金同步未完成，未變更標記。請查看官方分頁提示後重試。');
  }else if(msg.type==='PSGB_PLATINUM_RESULT'){
   finishPlatinum();
   try{

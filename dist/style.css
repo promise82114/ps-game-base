@@ -62,3 +62,17 @@ details{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:
 #import-effect{border-left:3px solid var(--accent);padding-left:12px;color:#d4e3fb}
 #library-difference-list p{overflow-wrap:anywhere}
 @media(max-width:700px){.comparison-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.comparison-columns{grid-template-columns:1fr}#confirm-dialog .dialog-actions{flex-wrap:wrap}.comparison-columns pre{font-size:11px}}
+
+/* Data tools are grouped behind the header entry on every screen size. */
+#data-dialog{width:min(740px,calc(100vw - 28px))}
+#data-dialog>.dialog-title{position:sticky;top:-28px;z-index:2;background:#181e2a;padding:12px 0;border-bottom:1px solid var(--line)}
+.data-section{padding:20px 0;border-bottom:1px solid var(--line)}
+.data-section:last-of-type{border-bottom:0}
+#data-dialog .data-section h3{margin:0 0 14px}
+.script-info{margin-top:12px;padding:18px;border:1px solid #3c506e;border-radius:10px;background:#1d293c}
+.script-version{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.script-version span{font-size:12px;color:var(--muted)}
+.sync-action{display:flex;align-items:center;gap:20px;padding:12px 0}
+.sync-action>div{flex:1;min-width:0}.sync-action h4{font-size:13px;margin:0}.sync-action p{margin:7px 0 0}
+.sync-action>button{flex:none;font-size:12px}.helper-help code{display:block;overflow-wrap:anywhere}
+@media(max-width:700px){#data-dialog>.dialog-title{top:-20px}.sync-action{display:block}.sync-action>button{margin-top:10px}.script-info{padding:14px}}

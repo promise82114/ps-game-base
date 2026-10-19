@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '..', 'dist', 'scripts', 'ps-game-base.user.js'), 'utf8');
+const bundle = fs.readFileSync(path.join(__dirname, '..', 'dist', 'scripts', 'ps-game-base.user.js'), 'utf8').replace(/\r/g,'');
+const source=bundle.split('// PSGB_LIBRARY_START\n')[1].split('// PSGB_LIBRARY_END')[0];
 const HASH = 'a'.repeat(64);
 const endpoint = 'https://web.np.playstation.com/api/graphql/v1/op';
 function officialUrl() {
@@ -38,7 +39,7 @@ function setup(responses = [], bridgeOrigin = '') {
     setTimeout(fn, ms) { return ms <= 350 ? setTimeout(fn, 0) : setTimeout(fn, ms); }, clearTimeout,
   });
   // Test-only access to the closure; no debug API exists in the installed script.
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.testApi = { inspect, sync, nextOffset, normalize, csvCell, state: () => ({authorization, queryHash, games, complete, busy, message, diagnostics, operations: [...operations], lastParseError}), stop: () => { generation++; pending?.abort(); } }; })();'), context);
+  vm.runInContext('const psgbTools={};\n'+source.replace(/\}\)\(\);\s*$/, 'globalThis.testApi = { inspect, sync, nextOffset, normalize, csvCell, state: () => ({authorization, queryHash, games, complete, busy, message, diagnostics, operations: [...operations], lastParseError}), stop: () => { generation++; pending?.abort(); } }; })();'), context);
   return { api: context.testApi, page, calls, messages };
 }
 function authorize(api) { api.inspect(officialUrl(), { Authorization: 'Bearer test-only' }); }
@@ -237,7 +238,7 @@ test('mixed form parsing triggers exactly one complete result on the existing br
 });
 test('entry uses recently-purchased while metadata supports the entire library host', () => {
   assert.match(source, /const LIBRARY = 'https:\/\/library\.playstation\.com\/recently-purchased'/);
-  assert.match(source, /@match\s+https:\/\/library\.playstation\.com\/\*/);
+  assert.match(bundle, /@match\s+https:\/\/library\.playstation\.com\/\*/);
 });
 
 test('bridge auto-sync returns whitelisted complete data only to the exact origin', async () => {

@@ -41,6 +41,16 @@ function setup(initial=fixture()){
  vm.createContext(context);vm.runInContext(source+'\nglobalThis.appTest={preview,getState:()=>state,getPending:()=>pendingImport};',context);
  return {nodes,storage,io,windowEvents,app:context.appTest};
 }
+test('header data entry opens the panel and keeps all data actions inside with one script installer',()=>{
+ const {nodes}=setup();nodes.get('settings').onclick();assert.equal(nodes.get('data-dialog').open,true);
+ const header=html.match(/<header>[\s\S]*?<\/header>/)[0],panel=html.match(/<dialog id="data-dialog">[\s\S]*?<\/dialog>/)[0];
+ assert.match(header,/id="settings"/);assert.doesNotMatch(header,/id="(?:import|fetch|sync-platinum)"/);
+ for(const id of ['import','fetch','sync-platinum','export-backup','export-library','export-personal','cloud-read','cloud-write'])assert.match(panel,new RegExp(`id="${id}"`));
+ assert.ok(panel.indexOf('01 / 腳本資訊')<panel.indexOf('02 / 更新與同步'));
+ assert.equal((panel.match(/href="scripts\//g)||[]).length,1);assert.doesNotMatch(panel,/trophy-probe\.user\.js/);
+ nodes.get('data-dialog').close();nodes.get('empty-import').onclick();assert.equal(nodes.get('data-dialog').open,true);
+});
+
 test('library renders every work beyond the old page size and filters the full result',()=>{
  const data=fixture('',Array.from({length:125},(_,i)=>String(i).padStart(3,'0')));
  data.library.games.forEach((g,i)=>{g.platform=i%2?'PS4':'PS5';});

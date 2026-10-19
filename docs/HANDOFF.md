@@ -2,6 +2,39 @@
 
 更新日期：2026-10-19（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
 
+## 2026-10-19 免助手直接授權修正（待 Chrome 驗收）
+
+- 使用者覺得每次開 PowerShell 麻煩，要求整合腳本直接完成白金同步。v0.4.1 正式按鈕不再呼叫本機助手，改用 GM `cookie` 選項向固定 Sony authorize 端點傳 NPSSO，manual redirect 嚴格驗證 code，再直接交換 token（token POST 也 manual）；不新增 connect／grant、不自動回退 localhost。
+- 先前 v0.1.3 手動 Cookie 標頭與 v0.1.4 依賴 jar 均失敗，v0.4.1 改管理器 cookie 專用選項。這是針對兩種 transport 與成功 Node 路徑差異的候選修正，不能視為已確認根因或 Sony／Chrome 成功。
+- 授權診斷增加 explicitSessionCookie 布林，官方白金面板提供「匯出授權診斷」；失敗送 auth 階段碼給管理頁，提示確認官方登入，不要求貼憑證。原有兩批並行、標記規則、備份與失敗整輪不套用均保留。
+- 舊研究助手與 benchmark 仍保留明確選用方式；正式同步不需要啟動助手。UI、README 與最新操作說明已更新；下方舊章節是歷史快照。
+- 完整 Node 測試 157 項通過：含全程不連 loopback、Cookie 僅發往 Sony authorize、失敗不回退、不發獎盃請求、不匯出憑證。語法／diff 與新版 UI 檢查待最終核對。
+- 基準 HEAD 仍為 `3fa7054`，main；前次 benchmark／整合及本次授權修改都尚未 commit／push。已請使用者 Chrome 安裝 v0.4.1、停用獨立舊腳本、重開官方分頁並直接點白金同步；結果仍待回覆。
+
+## 2026-10-19 納入實測、單一腳本與資料面板
+
+- 實際報告 v0.3.0 完整完成：24 個版本；單次 10／15 個各 HTTP 400。四組每批 5 個皆 HTTP 200、結果一致；循序 350ms 4.003 秒、循序零間隔 2.480 秒、兩批並行 1.822 秒、三批並行 1.892 秒。無 429。報告含私人資料，不加入 repo。
+- 使用者授權優化後，整合腳本 v0.4.0 正式白金同步改為每批 5 個、兩批並行、零間隔。進度依已完成版本累加；一般錯誤停止派送、等待在途結束，整輪不套用；取消中止在途，不重試。1,800 個版本約 1 分 59 秒僅為短測粗估，非全庫實測。
+- 唯一安裝檔 `dist/scripts/ps-game-base.user.js`：沿用原遊戲庫名稱／namespace，新增既有獎盃所需 grant／固定 connect。舊 `ps-game-base-trophy-probe.user.js` 已移除；使用者須更新遊戲庫腳本並停用／移除已安裝的獨立獎盃腳本。助手仍需同電腦啟動。
+- 兩種資料操作保留獨立狀態、origin／child／session 驗證及資料格式；遊戲庫在新增 grant 後使用 unsafeWindow 觀察官方請求。一般官方頁只有遊戲庫入口，手動點「獎盃研究工具」才展開研究面板；白金橋接分頁不掛載遊戲庫面板。
+- 網頁右上角只留「資料與同步」入口；面板先腳本資訊，接著更新與同步、匯入與匯出、Google Drive。既有比較、訊息、復原與個人資料保護流程保留。
+- 基準 HEAD `3fa7054`（main）。包含上次尚未提交的 benchmark 與本次整合優化；本次未獲 commit／push 指示。變更涉及 AGENTS、README、HANDOFF／獎盃文件、app／index／style、整合腳本、刪除獨立獎盃腳本及相關測試。驗證最終結果以下方更新為準。
+- 驗證：完整 Node 測試 154 項通過，0 失敗／跳過；包含兩批並行、回應順序不同、錯誤／取消停止後續派送、既有資料保留、面板入口與完整整合腳本的 unsafeWindow 回傳。語法及 diff 檢查通過。
+- 瀏覽器：獨立 `127.0.0.1:4177` 驗證桌面及 390px iframe 窄版面、面板內操作訊息、單一安裝入口；另以真正整合腳本及 24 個合成版本驗證遊戲庫／研究工具切換、鍵盤返回、候選讀取與背景獎盃請求為 0。臨時頁已刪除。未驗證更新後的 Chrome／Tampermonkey、Sony 全庫或 Google Drive；不以合成測試代替真實帳號驗收。
+
+以下為先前各階段快照；其中腳本版本／路徑與「待收到報告」已由上述最新記錄取代。
+
+## 2026-10-19 獎盃容量與速度測試
+
+- 使用者要求實測單次 10／15 個是否仍失敗，以及加速分批。獎盃腳本升至 v0.3.0，新增獨立效能測試按鈕；正式白金同步仍為每批 5 個、循序 350ms，不自動更改速度或整理資料。
+- 取前 15–30 個候選，先用每批 5 個建立基準，再測 10／15 個，與循序零間隔、2／3 批並行對照。最多 26 個獎盃請求，另 3 個授權步驟；組別間冷卻 1 秒。無背景掃描、失敗重試或雲端寫入。
+- 除 HTTP 及耗時，也比對已知獎盃組與已取得白金數；把可對應 ID 放在大請求尾端，避免 HTTP 200 但只處理前 5 個被當成成功。尾端無可用對應時標記證據不足。
+- 429／401／403／網路或取消停止後續請求；在途最多 3 個可稍後結束。匯出 benchmark JSON 含部分結果、HTTP、最大並行數、耗時、一致性與 1,800 個版本的粗估，不含憑證或原始回應。
+- 工作基準 `3fa7054`（main）。本次尚未 commit／push；變更為 `AGENTS.md`、README、交接／獎盃說明、`dist/index.html` 腳本版本提示、獎盃 userscript 及對應測試。原始 tampermonkey-scripts repo 不動。
+- 合成測試涵蓋 400 拒絕、200 靜默截斷、沒有尾端對應、不超過 3 個 workers、最多 26 次、限流／授權失效、停止及敏感資料排除。Sony 實際容量與加速結果仍待使用者 Chrome 報告；不能以 mock 或文件宣稱已實測成功。
+- 完整 Node 測試 147 項通過；另以獨立的合成回應頁面在內建瀏覽器驗證按鈕、執行中的停用狀態、完成摘要、容量拒絕及 4 組速度結果。臨時 UI 驗證頁已刪除，不納入發布，也不代表 Sony 實測。
+- 助手已於本次啟動供測試（15 分鐘後停止接收連線）。下一步由 Chrome 更新 v0.3.0、重新整理官方頁、按效能測試並匯出 JSON，再依實際結果決定正式同步速度。
+
 ## 2026-10-19 匯出檔名補時分
 
 - 管理頁所有 JSON 匯出、數位庫腳本 JSON／CSV、獎盃測試 JSON 的檔名統一採瀏覽器本機時間 `YYYY-MM-DD_HH-mm`，例如 `ps-game-base-backup-2026-10-19_14-35.json`。使用安全分隔符，不含 Windows 禁用的冒號。
@@ -34,7 +67,7 @@
 ## 先看這裡
 
 - 遊戲庫、分類、版本合併、JSON／Drive 差異比較已有實作；程式直接位於 `dist/`，沒有建置步驟。
-- 本機助手模式已取得真實獎盃結果；最新版 **0.2.1** 已加入管理頁手動補標白金，使用者已回報 Chrome 同步完成並看到新增白金筆數。瀏覽器直接授權路徑仍未驗證成功。
+- 本機助手模式已取得真實獎盃結果；最新版 **0.3.0** 已加入管理頁手動補標白金，使用者已回報 Chrome 同步完成並看到新增白金筆數。瀏覽器直接授權路徑仍未驗證成功。
 - **獎盃腳本、助手、對應測試及說明隨本次交接提交納入版本管理。** 新電腦取得本次提交後即可接續；最新 hash 請以 `git log -1` 核對。
 - 更換電腦還需要另行搬移個人 JSON；Git 不包含瀏覽器存檔、Chrome／Sony 登入狀態或已安裝的 Tampermonkey 版本。
 
@@ -90,7 +123,7 @@
 | `dist/sync.js` | 差異比較、衝突選擇與合併模型 |
 | `dist/shared/google-auth.js`、`drive-appdata.js` | Google 暫存授權與 Drive appData 備份 |
 | `dist/scripts/ps-game-base.user.js` | 正式遊戲庫撈取副本，v0.2.3 |
-| `dist/scripts/ps-game-base-trophy-probe.user.js` | v0.2.1，手動白金同步及獨立獎盃研究 |
+| `dist/scripts/ps-game-base-trophy-probe.user.js` | v0.3.0，手動白金同步及獨立獎盃研究 |
 | `tools/trophy-auth-helper.mjs` | 獎盃研究專用暫時服務，不隨 Pages 執行 |
 | `tests/` | Node 測試，包含模型、合成 DOM、腳本、Drive 與助手 |
 | `server.mjs` | 本機靜態伺服器，預設 127.0.0.1:4175 |
@@ -175,7 +208,7 @@ npm start
 
 開啟 [本機遊戲庫](http://127.0.0.1:4175/)，透過完整備份預覽後匯入。原有本機／localhost／Pages 的 localStorage 是分開的，即使網址相同，新電腦也沒有舊瀏覽器資料。
 
-正式同步安裝本 repo 的 `dist/scripts/ps-game-base.user.js` **0.2.3**；白金同步／獎盃研究另安裝 `dist/scripts/ps-game-base-trophy-probe.user.js` **0.2.1**。磁碟檔更新不會自動讓 Tampermonkey 採用新版，須更新已安裝腳本並重新整理 Sony 頁面。自行在 Chrome 登入 Sony，不複製／索取 Cookie 或 token。
+正式同步安裝本 repo 的 `dist/scripts/ps-game-base.user.js` **0.2.3**；白金同步／獎盃研究另安裝 `dist/scripts/ps-game-base-trophy-probe.user.js` **0.3.0**。磁碟檔更新不會自動讓 Tampermonkey 採用新版，須更新已安裝腳本並重新整理 Sony 頁面。自行在 Chrome 登入 Sony，不複製／索取 Cookie 或 token。
 
 獎盃研究另開終端執行：
 
