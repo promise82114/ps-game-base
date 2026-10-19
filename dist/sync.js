@@ -1,4 +1,4 @@
-import {personal, groupGames, workRecordFor, mergeLibrary} from './model.js?v=20261019-2';
+import {personal, groupGames, workRecordFor, mergeLibrary} from './model.js?v=20261019-5';
 
 // Compare content, not clocks: an older backup may contain a deliberate clear.
 const content = r => r && JSON.stringify([r.status,r.note,[...r.categories].sort(),[...r.tags].sort(),r.favorite,r.rating]);

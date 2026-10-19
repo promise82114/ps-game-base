@@ -1,7 +1,7 @@
-import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js?v=20261019-2';
-import {icon} from './icons.js?v=20261019-2';
-import {compareImport,resolveImport} from './sync.js?v=20261019-2';
-import {platinumTitleIds,applyPlatinum} from './platinum.js?v=20261019-2';
+import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js?v=20261019-5';
+import {icon} from './icons.js?v=20261019-5';
+import {compareImport,resolveImport} from './sync.js?v=20261019-5';
+import {platinumTitleIds,applyPlatinum} from './platinum.js?v=20261019-5';
 const $ = id => document.getElementById(id), KEY = 'ps-game-base.v1';
 let state = {library:{schemaVersion:1,complete:false,syncedAt:null,games:[],missingIds:[]},personal:emptyPersonal()}, view='all', category='', selected=new Set(), shown=[], pendingImport=null, demo=false;
 let bridge=null, bridgeTimer, cloudRead=false, cloudBusy=false, prepared=false;
@@ -173,7 +173,7 @@ $('sync-platinum').onclick=()=>{
  url.hash=new URLSearchParams({psgbPlatinumOrigin:location.origin,psgbPlatinumSession:session}).toString();
  const child=window.open(url.href,'_blank');if(!child)return notice('分頁無法開啟，請允許彈出視窗。');
  platinumBridge={session,child,titleIds,started:false};setPlatinumBusy(true);waitPlatinum();
- notice('已開啟官方分頁，等待白金同步腳本。請確認已登入、腳本已更新，且本機獎盃助手正在運作。');
+ notice('已開啟官方分頁，等待白金同步腳本。請確認 Sony 已登入、整合腳本已更新；本次直接交換授權，不需啟動助手。');
 };
 function setPlatinumBusy(busy){$('sync-platinum').disabled=busy;$('sync-platinum').textContent=busy?'白金同步中…':'同步白金標記';}
 function finishPlatinum(){clearTimeout(platinumTimer);platinumBridge=null;setPlatinumBusy(false);}
@@ -188,7 +188,7 @@ window.addEventListener('message',event=>{
   if(!Number.isInteger(msg.checked)||msg.checked<0||msg.checked>pending.titleIds.length)return;
   waitPlatinum();notice(`白金同步中：已檢查 ${msg.checked} / ${pending.titleIds.length} 個版本…`);
  }else if(msg.type==='PSGB_PLATINUM_ERROR'){
-  finishPlatinum();notice(msg.code==='helper'?'本機獎盃助手未連線，未變更標記。請啟動 tools/trophy-auth-helper.mjs（15 分鐘後停止接收連線）再重試。':msg.code==='auth'?'瀏覽器授權尚未完成，未變更標記。請在官方分頁確認 Sony 已登入；仍失敗時可在該面板匯出授權診斷。':msg.code==='cancelled'?'白金同步已取消，未變更標記。':'白金同步未完成，未變更標記。請查看官方分頁提示後重試。');
+  finishPlatinum();notice(msg.code==='helper'?'收到舊版助手流程的錯誤，未變更標記。請更新整合腳本並重新開啟官方分頁，使用免助手同步。':msg.code==='auth'?'瀏覽器授權尚未完成，未變更標記。請在官方分頁確認 Sony 已登入；仍失敗時可在該面板匯出授權診斷。':msg.code==='cancelled'?'白金同步已取消，未變更標記。':'白金同步未完成，未變更標記。請查看官方分頁提示後重試。');
  }else if(msg.type==='PSGB_PLATINUM_RESULT'){
   finishPlatinum();
   try{

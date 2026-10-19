@@ -2,6 +2,46 @@
 
 更新日期：2026-10-19（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
 
+## 2026-10-19 v0.4.5 提交範圍與驗證
+
+- 使用者已要求 commit & push。本次提交整合 v0.4.3 至 v0.4.5 的免助手研究、成功的 sso_token 正式授權、單筆診斷、操作提示、資源版號及交接文件；基準 HEAD `a6c00c2`，main。提交 hash 與遠端是否同步以實際 Git 紀錄為準，下方各階段「未 commit／push」為當時快照。
+- 提交前完整 175 項 Node 測試、腳本語法及差異檢查通過；變更只含 10 個已追蹤的專案檔案，沒有私人 JSON、憑證、臨時測試頁或未追蹤檔。研究測試成功提示改為可直接回管理頁同步，移除先前候選階段的過時指示。
+- Sony 授權／單筆獎盃已有使用者真實成功報告；免助手全庫操作仍待驗收。推送 main 會觸發 Pages，部署完成需另以 Actions 狀態確認，不能只憑 push 成功判定。
+
+## 2026-10-19 14:33 純 Tampermonkey 實測成功，v0.4.5 接回正式同步
+
+- 使用者實際報告 v0.4.4、Tampermonkey 5.5.1：Sony 登入 200／493ms、sso_token 交換 200／702ms、獎盃摘要 200／713ms，取得一筆合法樣本；complete、sessionReadVerified、tokenExchangeVerified、trophyAccessVerified 均 true。純 Tampermonkey 路徑已證實，不再記為授權失敗或待單筆驗收。私人 JSON／遊戲內容不加入 Git。
+- v0.4.5 將正式 syncPlatinum 的授權改為 browser-sso-token，一般研究摘要按鈕亦採同路徑；正式診斷模式同步更新。保留 5 ID／批、兩批並行、取消／失敗停止及全輪成功才回傳、嚴格已取得白金判定與所有個人資料保護。無 fallback、無助手或舊 App authorize 請求；研究工具的明確助手備援與舊內部對照未擴大。
+- 管理頁原等待訊息仍含「本機助手正在運作」的過時文字，本輪一併修正；舊 helper 錯誤改提示更新整合腳本。index 版本／說明及現行文件改為成功的授權方式，快取版號 20261019-5。更新已安裝腳本、關閉舊官方頁、重整管理頁後可直接按「資料與同步 → 同步白金標記」。
+- 基準 HEAD `a6c00c2`、main；開始時既有 10 檔未提交修改，保留延續，本輪仍在同一組檔案內。未 commit／push。174 項 Node 測試通過；正式授權 fixtures 更新為兩步直換並檢查無 authorize／Cookie／loopback，另涵蓋 grant 拒絕後停止、原分批與資料套用測試。真實成功目前限授權與單筆 API，免助手全庫查詢／補標／儲存及長時間限流仍待使用者操作驗收。
+- 最終驗證更新為 175 項，另含一般研究摘要採 SSO 及原查詢上限。獨立 4177 真實瀏覽器以完整腳本與合成管理訊息／GM 回應跑正式 syncPlatinum：12 個版本、5 次請求（2 授權 + 3 批）、只回傳 2 個白金版本，助手／authorize 請求均 0；實際管理頁確認 v0.4.5 資料面板、安裝連結及免助手說明。這仍屬合成流程，未寫真實使用者存檔。臨時測試頁及服務已清除。
+
+## 2026-10-19 14:21 實測失敗後，v0.4.4 改測直接權杖交換
+
+- 收到使用者 v0.4.3／TM 5.5.1 實測：sony-session 200／330ms，anonymous 單一 Cookie 的 session 200／310ms，sessionCookieVerified:true；authorize network／408／624ms，failed-to-fetch，無 Location／code；未交換 token，獎盃 0、標記未變更。私人報告不加入 Git。排除原有 Cookie 的方案沒修通，不再重跑該組當修正。
+- 續查找到 andshrew/PlayStation-Stars 的 sso_token 範例，使用相同公開 client、scope、Sony token 端點直接 POST，不經 authorize／App URI。開發端用假 NPSSO 進行一次 Node 探測，HTTP 400、invalid_grant、無 token；沒有使用真實帳號登入資料，不代表有效登入會成功或 Chrome 驗收通過。
+- v0.4.4 將研究／白金面板的候選按鈕更新為「測試直接交換權杖（只查 1 筆）」，最多 3 次 Sony 請求；無候選遊戲需求、不呼叫助手／authorize、不回退或重試、失敗／取消即停。輸出 browser-sso-token、sessionReadVerified／tokenExchangeVerified／trophyAccessVerified；授權診斷增加安全 grantType／白名單 oauthError。所有結束清除 token，不寫標記或管理頁結果。獨立 Cookie 只保留內部對照，正式白金流程尚未改用候選。
+- 開始時已存在前輪 10 個修改檔案，保留並延續；基準 HEAD `a6c00c2`、main。本輪變更同一組腳本／測試／文件與 index 版本說明，資源版號更新為 20261019-4。未 commit／push。曾評估沿用網頁登入的方向，但找到更直接的 grant 範例後未保留該試作，最終沒有共用／匯出遊戲庫 Bearer 或新增網頁登入測試按鈕。
+- 驗證：完整 173 項 Node 測試通過、語法／差異檢查通過；涵蓋直接 grant 的固定端點與三次上限、未呼叫 authorize／助手、無管理頁標記結果、OAuth 錯誤白名單／敏感內容排除、所有階段錯誤／取消、無效 token 及空獎盃清單。獨立 4177 真實瀏覽器搭配合成 GM 回應，確認新按鈕鍵盤操作、成功 3 次／拒絕 2 次即停止，授權碼／助手／標記結果皆 0；不是 Sony 實測。HTTP 已確認本機 4175 提供 v0.4.4；測試頁與 4177 臨時服務已清除。下一步由使用者 Chrome 更新 v0.4.4 並按新測試按鈕，提供匯出 JSON。
+
+## 2026-10-19 v0.4.3 獨立 Cookie 授權候選測試
+
+- 使用者授權繼續找純 Tampermonkey 授權方法並準備下一步小範圍測試。核對 TM issue #2754 維護者對舊版 cookie 合併的說明與 anonymous 建議；這不是本案已確認根因。沒有新增套件、grant／connect、擴充套件或助手依賴。
+- 新增「測試免助手授權（只查 1 筆）」，一般研究工具及白金面板皆可手動點擊、不需候選遊戲。最多 5 次固定 Sony 請求：一般登入、anonymous 單一 npsso 的登入一致性驗證、相同選項 authorize、token、最近 1 筆獎盃摘要。維持原 client／scope／redirect URI；非預期 HTTP、network、格式失敗或取消即停，不重試、不換路徑。
+- 輸出 authMethod:browser-isolated-cookie、sessionCookieVerified、trophyAccessVerified、安全診斷與至多一筆摘要；檔名 ps-game-base-browser-auth-日期_時分.json。成功須真的通過獎盃 HTTP 200 與結構驗證；有效空清單代表沒有樣本。所有結束路徑清除 token，不刪 Cookie、不回傳管理頁結果或寫標記／Drive。
+- 正式同步維持原授權路徑；候選需使用者 Chrome／Tampermonkey 真實成功後再接回。此次不是單純重跑 v0.4.2 四組，也不宣稱已解決 App URI 或成功取代助手。
+- 工作基準 HEAD `a6c00c2`（main）；開始時 README、HANDOFF、trophy-probe 有前輪診斷文件修改，保留並延續。本輪修改整合腳本、trophy-probe 測試、index 版本／說明、AGENTS 及上述文件；資源版本更新為 20261019-3（既有工具改 index／app／sync／platinum 相依網址）。未 commit／push。
+- 驗證：完整 169 項 Node 測試通過、語法檢查通過；新增候選流程成功、Cookie 不一致、每一步 401／403／429／network、取消、重複啟動、隱私、回應上限及合法空清單驗證。Sony 實測仍待使用者更新 v0.4.3 回報，不能把合成測試當授權成功。
+- 獨立 127.0.0.1:4177 的真實瀏覽器搭配合成 GM 回應，確認 v0.4.3 新按鈕可用鍵盤操作；成功情境請求 5、顯示一筆摘要，失敗情境在 authorize 的第 3 個請求停止，登入已驗證／獎盃未確認的狀態清楚可見。兩者助手及管理頁標記結果均 0。測試頁不接 Sony，臨時頁與服務已清除；此為 UI 驗證，並非 Chrome／Tampermonkey／Sony 授權成功。
+
+## 2026-10-19 13:59 Chrome 傳輸對照已收到
+
+- 基準 HEAD `a6c00c2`（main，開始時與 origin/main 一致且工作目錄乾淨），v0.4.2 診斷已在該提交內。本輪只更新 README、本交接文件與 trophy-probe 實測記錄，未修改正式程式、未 commit／push；私人 JSON 不加入 Git。
+- 使用者真實報告：Tampermonkey 5.5.1，一般／Fetch／manual 的 ssocookie 均 HTTP 200，耗時 308／609／303ms，hasSession 均 true；anonymous manual authorize HTTP 301／341ms，可讀到 sony-web 轉址，無 code。四組完成、獎盃請求 0、沒有 token 交換或標記變更。官方庫 9 次解碼、2 次已購買回應、48 筆原始列、解析錯誤 0。
+- 排除所有 Fetch／manual 請求皆失效的推論；匿名的 Sony 網站轉址可讀，不等於帶登入資料的授權成功，也沒驗證 App 專用 URI。v0.4.1 的帶登入資料 authorize 仍是 network／408；Cookie 實際處理與 App URI 的差異尚未分開證實，不直接定因 Chrome／Tampermonkey。
+- 已核對 psn-api 授權原始碼與 Tampermonkey 文件：前者從 App 專用 Location 取得 code，後者 manual 強制使用 Fetch。需先取得能分離該差異的證據或已驗證的同環境解法，再改正式授權；不要要求使用者重跑相同四組，或以更改白金批次、擴大權限處理。僅保留 Tampermonkey 的限制不變，免助手同步尚未修通。
+- 本輪為文件變更：核對原始報告數值、文件連結與 git diff --check；沒有重跑程式測試。先前 163 項合成測試通過不代表 Sony 授權成功。下方「待提供 v0.4.2 報告」為歷史快照，已由本節取代。
+
 ## 2026-10-19 v0.4.2 傳輸對照：只保留 Tampermonkey
 
 - 使用者已回覆「希望只保留 Tampermonkey 腳本」。不新增擴充套件、公開授權代理、常駐助手；正式直接授權仍未成功，不宣稱這版已修通。

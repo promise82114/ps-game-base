@@ -2,7 +2,7 @@
 
 本機優先的 PlayStation 遊戲庫管理頁。原生 HTML / CSS / JavaScript，無須安裝 npm 套件，不會自動上傳資料。
 
-換機或接續開發先看 [交接與執行進度](docs/HANDOFF.md)；協作、資料約束與 commit／發布規則見 [AGENTS.md](AGENTS.md)。本機助手授權與獎盃查詢已有真實帳號成功結果；2026-10-19 使用者亦回報新版白金標記同步完成，看到新增白金筆數。換機前請依交接清單另行保存個人備份。
+換機或接續開發先看 [交接與執行進度](docs/HANDOFF.md)；協作、資料約束與 commit／發布規則見 [AGENTS.md](AGENTS.md)。2026-10-19 Chrome／Tampermonkey 的免助手授權與單筆獎盃查詢已實測成功，v0.4.5 接回正式白金同步。先前助手流程也曾完成實際補標；新免助手版本的全庫操作仍待驗收。換機前請依交接清單另行保存個人備份。
 
 ## 啟動
 
@@ -23,7 +23,7 @@ npm start
 - 發布前自動用本次 commit SHA 更新本機 JS／CSS 網址的 `?v=`，涵蓋入口、共用腳本及 ES module 相依檔案，避免新版 HTML 混用舊快取。直接發布 `dist/` 前可先執行 `node tools/version-assets.mjs <版本號>`；同次發布共用一個新版本號，不需更改 Tampermonkey 的腳本版本。
 - GitHub repo 的 Settings → Pages → Build and deployment → Source 須選擇 **GitHub Actions**。
 - 此 repo 的預設 Pages 網址為 `https://promise82114.github.io/ps-game-base/`；實際發布網址以 Actions 的部署結果為準。
-- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的整合腳本至 0.4.2。
+- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的整合腳本至 0.4.5。
 - Google OAuth Client 的「已授權 JavaScript 來源」須加入 `https://promise82114.github.io`（僅 origin，不含 `/ps-game-base/`）。此設定需由 Google Cloud 管理者操作。
 - 本機與 Pages 的瀏覽器存檔分開；可透過完整 JSON 備份搬移。
 - 與 EDF 相同，首頁設定 `<meta name="robots" content="noindex, nofollow">`，要求支援此規則的搜尋引擎不要收錄。這不是存取控制，知道公開網址的人仍可開啟網站；個人匯入資料不隨靜態網站發布。參考 [Google noindex 說明](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
@@ -42,7 +42,7 @@ npm start
 
 ## 分頁撈取更新
 
-開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.4.2，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
+開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.4.5，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
 
 1. 先在 Chrome / Edge 安裝 Tampermonkey。
 2. 在頁面的「資料與同步」點「安裝 / 更新 Tampermonkey 腳本」，或將副本內容貼入 Tampermonkey 新腳本。
@@ -58,7 +58,7 @@ npm start
 
 0.2.2 完整補回原版 0.1.3 的 `parsePayload` 與解析階段診斷。保留 `/recently-purchased`、JSON／批次 GraphQL、URL-encoded POST、Request 複本、無 Bearer 工作階段與管理頁回傳流程。修正 0.2.1 漏掉的「網址參數與表單本文合併」：例如操作名稱在網址、extensions 在表單時，現在可取得查詢碼；表單欄位優先於同名網址欄位。這個缺口已用合成請求重現並修正，但不能斷定使用者截圖的所有格式錯誤都由此造成。
 
-更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.4.2；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
+更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.4.5；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
 
 請提供診斷列與面板提示即可，不要提供 Cookie、Bearer、NPSSO 或含授權標頭的 HAR。Sony 真實登入後的同步與分頁回傳仍須實機驗收。
 
@@ -147,14 +147,14 @@ Google GIS Token Model 在使用者點擊後取得暫存 access token；Drive sc
 
 ## 獎盃小範圍測試（整合腳本內的選用工具）
 
-遊戲庫與白金功能已合併為 `dist/scripts/ps-game-base.user.js` v0.4.2，只需安裝這支。若先前安裝過「PS Game Base 獎盃小範圍測試」，請停用或移除舊腳本，避免重複攔截與面板。安裝時保留原遊戲庫腳本的名稱及 namespace，支援原腳本更新。
+遊戲庫與白金功能已合併為 `dist/scripts/ps-game-base.user.js` v0.4.5，只需安裝這支。若先前安裝過「PS Game Base 獎盃小範圍測試」，請停用或移除舊腳本，避免重複攔截與面板。安裝時保留原遊戲庫腳本的名稱及 namespace，支援原腳本更新。
 
 一般官方分頁只顯示遊戲庫入口；由該面板點「獎盃研究工具」才展開研究模式，可返回遊戲庫。每輪手動研究仍最多 5 個 title ID，不寫分類或 Drive。獎盃 API 只有點擊研究／白金操作才查詢。詳細說明見 [獎盃測試與白金同步](docs/trophy-probe.md)。
 
 ## 同步白金標記
 
-1. 在右上角「資料與同步」第一欄安裝／更新**整合腳本 v0.4.2**，停用舊的獨立獎盃腳本，儲存後重新開啟官方分頁。
-2. 確認同一個 Chrome 已登入官方遊戲庫。v0.4.1 改由整合腳本直接向 Sony 交換暫存授權，不連線本機助手、不要求開啟 PowerShell。v0.4.1 的 Chrome 實測在授權碼步驟仍 network／408，尚未修通；v0.4.2 新增連線對照，不宣稱已成功取代助手。
+1. 在右上角「資料與同步」第一欄安裝／更新**整合腳本 v0.4.5**，停用舊的獨立獎盃腳本，儲存後重新開啟官方分頁。
+2. 確認同一個 Chrome 已登入官方遊戲庫。v0.4.5 使用已通過 Chrome／Tampermonkey 小範圍實測的 sso_token 直接交換暫存權杖，不經 App 授權碼轉址、不連本機助手、不需要另開 PowerShell。請更新已安裝的腳本並關閉舊官方分頁，僅更新網站不會更新 Tampermonkey。
 3. 回遊戲庫，在「資料與同步 → 更新與同步」按「同步白金標記」。此時才另開官方分頁、取得授權，依本次庫版本查詢，每批最多 5 個 title ID、兩批並行且無額外間隔。平常開頁面、搜尋或更新數位庫不會觸發獎盃查詢。
 4. 確認任一已知 PS4／PS5 版本的 `earnedTrophies.platinum` 是正整數，就將對應作品設為既有的 `已白金`。只判斷帳號已取得白金，不以遊戲設有白金或總進度判斷。原本追蹤／忽略會由白金取代；已白金的作品略過。
 
@@ -211,6 +211,24 @@ v0.4.0 正式白金同步採每批 5 個、兩批並行、零間隔。約 1,800 
 參考 [Tampermonkey GM_xmlhttpRequest 文件](https://www.tampermonkey.net/documentation.php?ext=d2&q=GM_xmlhttpRequest) 的 cookie／redirect 選項，以及 [psn-api 授權碼交換原始碼](https://github.com/achievements-app/psn-api/blob/main/src/authenticate/exchangeNpssoForAccessCode.ts)。
 
 
+### v0.4.5：免助手流程接回正式白金同步
+
+2026-10-19 14:33（UTC+8）收到 v0.4.4 真實成功報告：Sony 登入、sso_token 交換、獎盃 API 都 HTTP 200，三個驗證布林及 complete 均 true，確實取得一筆摘要。v0.4.5 的「資料與同步 → 同步白金標記」及一般研究摘要改用同一授權方式；無須啟動助手，也不會在失敗時改用舊轉址或助手。
+
+每批 5 個版本、兩批並行與只補已取得白金的規則保留；未知／尚未白金／既有白金不動，其他整理及 Drive 不動。175 項合成測試通過，正式分頁回傳／備份／儲存測試保留；本次真實成功只驗證授權及單筆查詢，完整數位庫的免助手補標仍待使用者實際操作。
+
+### v0.4.4：不經 App 轉址的直接權杖交換（小範圍實測成功）
+
+v0.4.3 已實測：獨立 Cookie 驗證成功，授權碼仍 network／408，未取得獎盃。v0.4.4 依社群的 sso_token 範例加入另一條授權路徑，直接向 Sony 權杖端點交換，不經 authorize 或 App 轉址；後續已收到真實帳號成功報告。
+
+原 v0.4.4 單筆測試由「PS Game Base → 獎盃研究工具 → 測試直接交換權杖（只查 1 筆）」執行，最多 3 個請求，不需候選遊戲、不連助手、不寫標記、不重試。v0.4.5 已將此流程接回正式白金按鈕，也保留單筆診斷工具。實測依據與安全界線見 [獎盃研究說明](docs/trophy-probe.md)。
+
+### v0.4.3：免助手授權小範圍測試（實測仍失敗）
+
+更新整合腳本 v0.4.3、關閉舊官方分頁，開啟官方遊戲庫，從 PS Game Base 面板進入「獎盃研究工具」，按「測試免助手授權（只查 1 筆）」。不需選遊戲、啟動 PowerShell 或另裝擴充套件。完成後匯出 `ps-game-base-browser-auth-日期_時分.json`；白金失敗面板也提供同一按鈕。
+
+這次依 Tampermonkey 維護者對同名 Cookie 的建議，以 anonymous:true 排除原有 Cookie，只傳本次取得的單一 npsso。先向 Sony 確認此登入資料可用，再嘗試既有授權交換，最後僅查最近一筆獎盃摘要。最多 5 個請求、不重試、不寫標記，所有結束路徑清除測試 token。這是不同於舊四組連線診斷的候選解法；正式白金同步尚未改用，需待 Chrome 實測成功。流程及結果判讀見 [獎盃研究說明](docs/trophy-probe.md)。
+
 ### v0.4.2：只用 Tampermonkey 的連線對照（尚未修通直接授權）
 
 2026-10-19 使用者 v0.4.1 診斷證實：Sony 工作階段 HTTP 200，手動重新導向的授權碼請求仍在 576ms 回報 network／408／failed-to-fetch，無 Location／code；獎盃請求為 0。使用者明確選擇只保留 Tampermonkey，不新增專用擴充套件。
@@ -218,3 +236,5 @@ v0.4.0 正式白金同步採每批 5 個、兩批並行、零間隔。約 1,800 
 更新 v0.4.2、重開官方分頁，在白金面板按「檢查瀏覽器連線（不改資料）」：最多 4 次固定 Sony 請求，對照一般／Fetch／manual 的 ssocookie，以及 anonymous 的授權重新導向。不交換 token、不查獎盃、不連本機助手、不更動標記或存檔。各組僅一次；遇 401／403／429 或手動停止，不再派送後續組。
 
 完成後按「匯出授權診斷」，檔名為 `ps-game-base-auth-checks-YYYY-MM-DD_HH-mm.json`。僅記錄 HTTP／network、transport、時間、是否讀到有效格式登入資料及重新導向分類，不匯出 Cookie、NPSSO、code、token、原始回應或完整 Location。`complete: true` 只表示四組檢查已跑完，不表示授權已成功。
+
+2026-10-19 13:59（UTC+8）Chrome 實測：一般／Fetch／manual 的登入讀取均 HTTP 200 且 hasSession:true；匿名授權對照 HTTP 301，可讀到 Sony 網站轉址，但沒有授權碼。這確認 Fetch 並非全面失效；帶登入資料換授權碼的失敗仍未修通。App 專用轉址的處理只是待驗證方向，不能認定為根因。詳見 [實測與判讀界線](docs/trophy-probe.md#chrome-實測結果2026-10-19-1359utc8)。

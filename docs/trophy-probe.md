@@ -1,6 +1,59 @@
 # 獎盃小範圍測試
 
-Tampermonkey 整合腳本目前 v0.4.2（`dist/scripts/ps-game-base.user.js`），提供選用研究模式，以及由管理頁按鈕啟動的白金標記同步。2026-10-19 使用者提供 v0.1.5 本機助手模式的真實結果：授權及三個獎盃請求均 HTTP 200、`complete: true`，部分樣本有成功對應；未對應仍保留未知。同日使用者完成新版 Chrome 白金標記同步驗收，回覆「完成，看到新增白金筆數」。瀏覽器直接授權路徑仍未驗證成功。
+Tampermonkey 整合腳本目前 v0.4.5（`dist/scripts/ps-game-base.user.js`），提供選用研究模式，以及由管理頁按鈕啟動的白金標記同步。2026-10-19 14:33（UTC+8）Chrome／Tampermonkey 免助手直接授權及單筆獎盃查詢已實測成功，本版接回正式同步；全庫免助手補標尚待驗收。先前本機助手模式亦曾取得真實資料，並由使用者回報補標完成。
+
+## v0.4.5：成功授權流程接回正式同步
+
+使用者提供 v0.4.4、Tampermonkey 5.5.1 真實報告：
+
+| 階段 | 結果 |
+| --- | --- |
+| Sony 登入讀取 | HTTP 200，493ms |
+| 直接 sso_token 交換 | HTTP 200，702ms，沒有 authorize／App 轉址 |
+| 最近一筆獎盃摘要 | HTTP 200，713ms，取得一筆合法摘要 |
+| 完成狀態 | complete、sessionReadVerified、tokenExchangeVerified、trophyAccessVerified 皆 true |
+
+這確認純 Tampermonkey 的此條授權及 API 路徑可用；不是單靠 HTTP 狀態、連線檢查或合成結果推論。私人原始 JSON、遊戲名稱及識別不加入文件／Git。
+
+正式「同步白金標記」現改用 authorize(run,'browser-sso-token')，一般研究的「獎盃摘要測試（免助手）」也使用同路徑。仍只在使用者點擊後授權及查詢，正式每批 5 個、兩批並行，失敗／取消不回傳部分標記；暫存 token 結束清除，不自動切回舊 authorize 或助手。未改商品範圍、作品對應、狀態、筆記、標籤、分類或 Drive。
+
+管理頁移除「助手須運作」的過時等待提示，舊助手錯誤改提示更新整合腳本。更新腳本至 v0.4.5 並關閉舊官方分頁，重新整理管理頁後按「資料與同步 → 同步白金標記」。小範圍已是真實成功；全庫的查詢、補標、儲存及長時間限流仍需實際操作驗收，不能將本報告擴大為已完成全庫測試。
+
+## v0.4.4：直接 SSO 權杖交換（小範圍實測成功，以下為準備紀錄）
+
+v0.4.3 真實結果：一般登入 HTTP 200／330ms；獨立 Cookie 驗證 HTTP 200／310ms，sessionCookieVerified:true；authorize 仍 network／408／624ms、failed-to-fetch，無 Location／code，獎盃請求 0。這證明排除原有 Cookie 的候選沒有修通，不代表 Cookie 本身失效，也不足以將根因定為 App URI。私人原始報告不加入 Git。
+
+本版新測試採 [andshrew/PlayStation-Stars 的直接交換範例](https://github.com/andshrew/PlayStation-Stars/blob/main/website/docs/query-api.md)：同一公開 client 與 scope，POST token 使用 grant_type:sso_token，不先呼叫 authorize、不依賴任何重新導向中的授權碼。該社群範例不能取代當前帳號驗收。
+
+開發端先以假 NPSSO、相同公開 client 做一次無真實帳號資料的 Node 探測：token 端點 HTTP 400、error:invalid_grant，未取得 token。這只驗證本次收到此錯誤回應，不能證明有效 NPSSO 會成功，也不是 Chrome／Tampermonkey 實測。
+
+更新 v0.4.4、關閉舊官方分頁，重開遊戲庫，進「PS Game Base → 獎盃研究工具 → 測試直接交換權杖（只查 1 筆）」。白金失敗面板也能執行；不需候選遊戲、PowerShell 助手或新擴充套件。最多 3 個請求：
+
+1. Sony ssocookie 讀取現有登入並驗證格式，只輸出 sessionReadVerified。
+2. 將 npsso 放在 URL-encoded 本文，僅 POST 到固定 Sony `/api/authz/v3/oauth/token`，帶既有公開 Basic client、相同 scope、token_format:jwt、grant_type:sso_token。anonymous:true、manual，不注入 Cookie、不跟隨轉址。成功驗證 token 格式及期限才輸出 tokenExchangeVerified。
+3. 只查最近一筆獎盃摘要，HTTP 200、合法陣列且至多一筆才輸出 trophyAccessVerified／complete:true；有效空清單表示沒有樣本，仍確認 API 接受授權。
+
+任一步驟錯誤／取消即停止、不重試、不自動回退，不連助手或呼叫 authorize；不回傳管理頁標記、不寫存檔，結束均清除 token。匯出維持 `ps-game-base-browser-auth-日期_時分.json`，authMethod:browser-sso-token。授權診斷新增安全的 grantType 與固定白名單 oauthError，不輸出 error_description、請求本文或憑證。
+
+這一輪測試按鈕已改走新流程；v0.4.3 獨立 Cookie 模式只保留內部對照。正式「同步白金標記」仍沿用原流程，待使用者真實結果成功後再接回。若 error:unsupported_grant_type／unauthorized_client，代表此 client 的直接交換在該環境未接受；若 invalid_grant，只能確認登入授權未成功，不自行改 client、scope 或重試。
+
+## v0.4.3：獨立 Cookie 授權與單筆獎盃驗證（實測仍失敗）
+
+本次測試與 v0.4.2 的四組連線診斷不同，實際嘗試授權及讀取一筆獎盃。Tampermonkey [同名 Cookie 問題與維護者建議](https://github.com/Tampermonkey/tampermonkey/issues/2754)指出，舊版 cookie 選項可能附加同名 Cookie，anonymous 可排除原有 Cookie；官方文件則標記同名取代在 5.6.6239+。使用者為 5.5.1，尚未證明本案真的有重複 Cookie；此為有來源依據的候選路徑，不能宣稱已修好 App 轉址問題。
+
+操作：更新整合腳本 v0.4.3、關閉舊官方分頁，開啟官方遊戲庫。從 PS Game Base 遊戲庫面板進入「獎盃研究工具」，按「測試免助手授權（只查 1 筆）」。不需選遊戲或啟動 PowerShell；原白金失敗面板也提供相同按鈕。完成後匯出 `ps-game-base-browser-auth-日期_時分.json`。
+
+每次點擊最多 5 個請求，均為既有固定 Sony 主機，不連助手、不重試、不自動換路徑：
+
+1. 一般 ssocookie 讀取本次登入資料。
+2. anonymous:true + manual + 單一 npsso cookie 再讀 ssocookie；必須與第一步一致才繼續。只匯出 sessionCookieVerified 布林，不匯出兩份登入資料。
+3. 相同獨立 Cookie 選項向既有 authorize 端點請求 code；維持原本 client、scope、App URI 及嚴格回傳驗證。
+4. anonymous:true + manual 交換 token，不附 npsso；權杖只在測試期間暫存。
+5. 只查 `/users/me/trophyTitles?limit=1&offset=0`，接受至多一筆合法獎盃摘要，僅白名單整理欄位輸出。HTTP 200 且結構正確才設 trophyAccessVerified 與 complete:true；有效空清單也表示 API 接受授權，但沒有樣本可檢視。
+
+任一步驟 network／非預期 HTTP／格式錯誤即停止；401／403／429 亦停止，不重試。停止按鈕中止在途請求，防止重複啟動；所有結果（含成功）均清除測試 token。不使用 Cookie 刪除／寫入 API、不保存 NPSSO／code／refresh token。不回傳管理頁結果、不查全庫、不寫標記或存檔。正式白金同步仍使用原本路徑，待使用者實測成功再接回，避免將候選方案直接投入全庫。
+
+若 sessionCookieVerified:true，但 authorize 仍 network／408，代表獨立 Cookie 的讀取驗證成功而授權碼仍失敗；仍不能由此斷言 auth 端點收到的 Cookie 或 App URI 是唯一根因。若完成則應有 4 筆 authRequests、1 筆 requests，接續先確認真實獎盃回應再決定正式整合。
 
 ## v0.4.2：限定 Tampermonkey 的傳輸對照
 
@@ -17,7 +70,26 @@ Tampermonkey 整合腳本目前 v0.4.2（`dist/scripts/ps-game-base.user.js`）�
 
 輸出沿用 probe schema，authMethod:browser-transport-check、checks 陣列；匯出為 `ps-game-base-auth-checks-日期_時分.json`。只記錄狀態、transport、時間、hasSession、redirectTarget／hasAccessCode 等分類／布林，無完整 Location 或登入本文。complete 只表示四組已完成，不表示授權成功。
 
-163 項 Node 測試通過，包含 Fetch 全失敗／只有 OAuth 失敗、固定 Sony 目的地與最多 4 次、無敏感資料、無助手／獎盃／回傳標記、限流／授權錯誤停止及取消。實際 Chrome 結果仍待使用者提供，不能將合成結果作根因結論。
+163 項 Node 測試通過，包含 Fetch 全失敗／只有 OAuth 失敗、固定 Sony 目的地與最多 4 次、無敏感資料、無助手／獎盃／回傳標記、限流／授權錯誤停止及取消。以下為後續收到的 Chrome 實測，與合成測試分開判讀。
+
+### Chrome 實測結果（2026-10-19 13:59，UTC+8）
+
+Tampermonkey 5.5.1、整合腳本 v0.4.2，四個對照均收到 HTTP 回應：
+
+| 對照 | HTTP | 耗時 | 結果 |
+| --- | --- | --- | --- |
+| ssocookie 一般模式 | 200 | 308ms | hasSession: true |
+| ssocookie Fetch | 200 | 609ms | hasSession: true |
+| ssocookie manual | 200 | 303ms | hasSession: true |
+| authorize anonymous manual | 301 | 341ms | sony-web 重新導向，沒有授權碼 |
+
+獎盃請求 0 次；沒有 token 交換或標記變更。官方庫捕捉 9 個 GraphQL、9 個已解碼回應、2 個已購買回應、48 筆原始遊戲列，解析錯誤 0。私人原始 JSON 不加入 repo。
+
+這排除了「所有 GM Fetch／manual 請求皆失敗」的說法，也證明本次匿名請求可讀到 Sony 網站的 HTTP 重新導向。它沒有驗證帶登入資料的 authorize，也沒有測到 App 專用 URI，因此不能把 HTTP 301 或 complete:true 當成 OAuth 成功。
+
+與 v0.4.1 的帶登入資料 authorize → network／408 相比，待查範圍集中在授權碼步驟；登入 Cookie 的實際處理及 App URI 重新導向仍未分離驗證。前人的 [psn-api 實作](https://github.com/achievements-app/psn-api/blob/main/src/authenticate/exchangeNpssoForAccessCode.ts) 從 Location 讀取 `com.scee.psxandroid.scecompcall://redirect` 的 code；[Tampermonkey 文件](https://www.tampermonkey.net/documentation.php?q=GM_xmlhttpRequest) 則說明 manual 會使用 Fetch。這是值得追查的環境差異，還不是已確認的失敗根因。
+
+下一步需先取得能分開上述差異的證據，或找到經驗證的同環境授權實作；不重跑這四組當成修正、不盲目更換 client／redirect URI、不以擴大網域權限或修改白金批次規則處理授權失敗。目前維持 v0.4.2 正式程式，免助手同步仍未完成驗收。
 
 ## v0.4.1：Chrome 實測仍失敗（2026-10-19）
 

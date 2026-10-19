@@ -20,7 +20,7 @@ function setup(responses=[],browser={},hash='',fastTiming=false){
   GM_xmlhttpRequest(options){calls.push(options);const next=typeof responses==='function'?responses(options,calls.length):responses.shift();if(next?.event==='throw')throw Error('PRIVATE_EXCEPTION');let aborted=false;const handle={abort(){aborted=true;options.onabort();}};const deliver=()=>{if(aborted)return;if(!next||next.event==='error')options.onerror(next);else options.onload({status:200,responseHeaders:'',...next});};if(next?.delayMs)setTimeout(deliver,next.delayMs);else setImmediate(deliver);return handle;}};
  Object.defineProperties(context.window,Object.getOwnPropertyDescriptors(browser));
  vm.createContext(context);
- const exposed=source.replace(/\}\)\(\);\s*$/,'globalThis.probe={runAuthChecks,runBenchmark,syncPlatinum,getBusy:()=>busy,accessCode,requestUrl,report,getCapture:()=>capture,getPage:()=>page,summarize,sampleGames,libraryResponse,runProbe,stop,authorize,request,setRoot(v){root=v;},setToken(v){token=v;expires=Date.now()+60000;},setSamples(games){samples=new Map(games.map(g=>[g.titleId,g]));selected=new Set(games.map(g=>g.titleId));},getResult:()=>result,getToken:()=>token,getSamples:()=>[...samples.values()]};})();');
+ const exposed=source.replace(/\}\)\(\);\s*$/,'globalThis.probe={runBrowserAuthProbe,runAuthChecks,runBenchmark,syncPlatinum,getBusy:()=>busy,accessCode,requestUrl,report,getCapture:()=>capture,getPage:()=>page,summarize,sampleGames,libraryResponse,runProbe,stop,authorize,request,setRoot(v){root=v;},setToken(v){token=v;expires=Date.now()+60000;},setSamples(games){samples=new Map(games.map(g=>[g.titleId,g]));selected=new Set(games.map(g=>g.titleId));},getResult:()=>result,getToken:()=>token,getSamples:()=>[...samples.values()]};})();');
  vm.runInContext('const psgbTools={};\n'+exposed,context);context.probe.setRoot(root);return {api:context.probe,calls,nodes};
 }
 const sample={titleId:'PPSA12345_00',name:'Test game',platform:'PS5'};
@@ -74,7 +74,7 @@ test('HTML response is an error and cannot be interpreted as an empty trophy lis
 
 test('initial session network failure records the previously missing diagnostic without leaking callback details',async()=>{
  const {api}=setup([{event:'error',status:0,finalUrl:'https://ca.account.sony.com/api/v1/ssocookie?token=PRIVATE_TOKEN',responseText:'PRIVATE_COOKIE',error:'PRIVATE_ERROR'}]);api.setSamples([sample]);await api.runProbe();
- const result=api.getResult();assert.equal(result.probeVersion,'0.4.2');assert.equal(result.manager.version,'test-version');assert.equal(result.requests.length,0);assert.equal(result.authRequests.length,1);assert.equal(result.authRequests[0].stage,'sony-session');assert.equal(result.authRequests[0].outcome,'network');assert.equal(result.authRequests[0].status,0);assert.equal(result.authRequests[0].transport,'default');assert.match(result.error,/Sony 登入工作階段/);assert.equal(JSON.stringify(result).includes('PRIVATE_'),false);
+ const result=api.getResult();assert.equal(result.probeVersion,'0.4.5');assert.equal(result.manager.version,'test-version');assert.equal(result.requests.length,0);assert.equal(result.authRequests.length,1);assert.equal(result.authRequests[0].stage,'sony-session');assert.equal(result.authRequests[0].outcome,'network');assert.equal(result.authRequests[0].status,0);assert.equal(result.authRequests[0].transport,'default');assert.match(result.error,/Sony 登入工作階段/);assert.equal(JSON.stringify(result).includes('PRIVATE_'),false);
 });
 test('access code and access token transport failures identify the exact step',async()=>{
  const session={responseText:JSON.stringify({npsso:'a'.repeat(64)})},code={status:302,responseHeaders:'Location: com.scee.psxandroid.scecompcall://redirect/?code=PRIVATE_CODE\r\n'};
@@ -163,7 +163,7 @@ function platinumSetup(responses){
  return {...env,messages,opener,events,done};
 }
 const helperResponses=()=>[{responseText:JSON.stringify({npsso:'a'.repeat(64)})},{responseText:JSON.stringify({kind:'ps-game-base-local-trophy-auth',nonce:'b'.repeat(48)})},{responseText:JSON.stringify({accessToken:'PRIVATE_ACCESS',expiresIn:3600})}];
-const directResponses=()=>[{responseText:JSON.stringify({npsso:'a'.repeat(64)})},{status:302,responseHeaders:'Location: com.scee.psxandroid.scecompcall://redirect/?code=PRIVATE_CODE\r\n'},{responseText:JSON.stringify({access_token:'PRIVATE_ACCESS',expires_in:3600})}];
+const directResponses=()=>[{responseText:JSON.stringify({npsso:'a'.repeat(64)})},{responseText:JSON.stringify({access_token:'PRIVATE_ACCESS',expires_in:3600,refresh_token:'PRIVATE_REFRESH'})}];
 test('production platinum uses two five-ID workers, handles out-of-order completion and reports completed counts',async()=>{
  const auth=directResponses(),ids=Array.from({length:23},(_,i)=>`PPSA${String(i).padStart(5,'0')}_00`);
  let active=0,maxActive=0,trophyCalls=0;
@@ -208,11 +208,11 @@ test('manager platinum sync is dormant, batches by five and returns only earned 
   {npTitleId:ids[2],trophyTitles:[{earnedTrophies:{platinum:'1'}}]},
   {npTitleId:'PPSA99999_00',trophyTitles:[{earnedTrophies:{platinum:1},private:'PRIVATE_ACCESS'}]}
  ]})},{responseText:JSON.stringify({titles:[{npTitleId:ids[6],trophyTitles:[{earnedTrophies:{platinum:1}}]}]})}]);
- assert.equal(env.calls.length,0);env.events.message({origin:'http://127.0.0.1:4175',source:env.opener,data:{type:'PSGB_PLATINUM_START',session:bridgeSession,titleIds:ids}});await env.done;assert.equal(env.calls.length,5);
- assert.equal(new URL(env.calls[3].url).searchParams.get('npTitleIds').split(',').length,5);assert.equal(new URL(env.calls[4].url).searchParams.get('npTitleIds').split(',').length,2);
+ assert.equal(env.calls.length,0);env.events.message({origin:'http://127.0.0.1:4175',source:env.opener,data:{type:'PSGB_PLATINUM_START',session:bridgeSession,titleIds:ids}});await env.done;assert.equal(env.calls.length,4);
+ assert.equal(new URL(env.calls[2].url).searchParams.get('npTitleIds').split(',').length,5);assert.equal(new URL(env.calls[3].url).searchParams.get('npTitleIds').split(',').length,2);
  const result=env.messages.at(-1);assert.equal(result.origin,'http://127.0.0.1:4175');assert.deepEqual(JSON.parse(JSON.stringify(result.message.earnedTitleIds)),[ids[1],ids[6]]);assert.equal(result.message.complete,true);
  for(const secret of ['PRIVATE_ACCESS','a'.repeat(64),'b'.repeat(48),'Authorization','earnedTrophies'])assert.equal(JSON.stringify(env.messages).includes(secret),false);
- assert.equal(env.api.getToken(),'');await env.api.syncPlatinum(ids);assert.equal(env.calls.length,5);
+ assert.equal(env.api.getToken(),'');await env.api.syncPlatinum(ids);assert.equal(env.calls.length,4);
 });
 test('manager sync ignores untrusted messages and does not query through standalone probe buttons',async()=>{
  const env=platinumSetup([]),data={type:'PSGB_PLATINUM_START',session:bridgeSession,titleIds:[sample.titleId]};
@@ -231,22 +231,37 @@ test('unknown titles preserve local state; browser auth and later API failures n
  }
 });
 
-test('platinum direct authorization never contacts loopback and only attaches the session cookie to Sony authorize',async()=>{
+test('production platinum uses the verified SSO grant without authorize, explicit cookies or loopback',async()=>{
  const env=platinumSetup([...directResponses(),{responseText:'{"titles":[]}'}]);await env.api.syncPlatinum([sample.titleId]);
- assert.equal(env.messages.at(-1).message.complete,true);assert.equal(env.calls.length,4);
+ assert.equal(env.messages.at(-1).message.complete,true);assert.equal(env.calls.length,3);
  assert.ok(env.calls.every(c=>new URL(c.url).protocol==='https:'));
- assert.deepEqual(env.calls.map(c=>!!c.cookie),[false,true,false,false]);
- assert.equal(env.calls[1].redirect,'manual');assert.equal(env.calls[2].redirect,'manual');
- const report=JSON.stringify(env.api.report());assert.match(report,/browser-cookie/);
- for(const value of ['a'.repeat(64),'PRIVATE_CODE','PRIVATE_ACCESS','refresh_token'])assert.equal(report.includes(value),false);
+ assert.deepEqual(env.calls.map(c=>!!c.cookie),[false,false,false]);
+ assert.equal(env.calls[1].url,'https://ca.account.sony.com/api/authz/v3/oauth/token');
+ assert.equal(env.calls[1].redirect,'manual');assert.equal(env.calls[1].anonymous,true);
+ assert.equal(new URLSearchParams(env.calls[1].data).get('grant_type'),'sso_token');
+ assert.equal(env.calls.some(c=>new URL(c.url).pathname.endsWith('/authorize')),false);
+ const report=JSON.stringify(env.api.report());assert.match(report,/browser-sso-token/);
+ for(const value of ['a'.repeat(64),'PRIVATE_CODE','PRIVATE_ACCESS','PRIVATE_REFRESH','refresh_token'])assert.equal(report.includes(value),false);
 });
 
 test('direct auth failure stays failed without silently falling back to localhost or requesting trophies',async()=>{
  const env=platinumSetup([directResponses()[0],{event:'error',status:408,statusText:'Failed to fetch PRIVATE_ERROR'}]);
  await env.api.syncPlatinum([sample.titleId]);assert.equal(env.calls.length,2);
  assert.equal(env.messages.at(-1).message.code,'auth');assert.equal(env.api.getToken(),'');
- assert.equal(env.api.report().authRequests.at(-1).explicitSessionCookie,true);
+ assert.equal(env.api.report().authRequests.at(-1).explicitSessionCookie,false);
+ assert.equal(env.api.report().authRequests.at(-1).grantType,'sso_token');
  assert.equal(env.api.report().requests.length,0);assert.equal(JSON.stringify(env.api.report()).includes('PRIVATE_ERROR'),false);
+});
+
+test('production SSO rejection stops with an auth error and never falls back or sends marks',async()=>{
+ for(const error of ['invalid_grant','unauthorized_client','unsupported_grant_type']){
+  const env=platinumSetup([directResponses()[0],{status:400,responseText:JSON.stringify({error,error_description:'PRIVATE_DETAIL'})}]);
+  await env.api.syncPlatinum([sample.titleId]);assert.equal(env.calls.length,2);
+  assert.equal(env.messages.at(-1).message.code,'auth');assert.equal(env.api.report().authRequests.at(-1).oauthError,error);
+  assert.equal(env.api.report().requests.length,0);assert.equal(env.api.getToken(),'');
+  assert.equal(env.messages.some(m=>m.message.type==='PSGB_PLATINUM_RESULT'),false);
+  assert.equal(JSON.stringify(env.api.report()).includes('PRIVATE_'),false);
+ }
 });
 
 test('explicit Sony session cookie cannot be forwarded to trophy, helper or other Sony routes',()=>{
@@ -356,4 +371,141 @@ test('transport control cancellation aborts in-flight work and does not dispatch
  const pending=api.runAuthChecks();api.stop();await pending;
  assert.equal(calls.length,1);assert.equal(api.getResult().complete,false);assert.equal(api.getResult().stopReason,'cancelled');
  assert.equal(api.getResult().checks.length,0);assert.equal(api.getToken(),'');
+});
+
+function browserAuthResponses(){return [
+ {responseText:JSON.stringify({npsso:'a'.repeat(64),private:'PRIVATE_SESSION'})},
+ {responseText:JSON.stringify({npsso:'a'.repeat(64),private:'PRIVATE_VERIFIED'})},
+ {status:302,responseHeaders:'Location: com.scee.psxandroid.scecompcall://redirect/?code=PRIVATE_CODE\r\n'},
+ {responseText:JSON.stringify({access_token:'PRIVATE_ACCESS',refresh_token:'PRIVATE_REFRESH',expires_in:3600})},
+ {responseText:JSON.stringify({trophyTitles:[{...trophy,private:'PRIVATE_TROPHY'}],private:'PRIVATE_ROOT'})}
+];}
+
+test('browser-only candidate verifies the explicit cookie, exchanges authorization and reads at most one trophy without manager writes',async()=>{
+ const {api,calls,messages}=platinumSetup(browserAuthResponses());api.setToken('PRIVATE_OLD_TOKEN');
+ assert.equal(calls.length,0);await api.runBrowserAuthProbe('browser-isolated');const value=api.report();
+ assert.equal(value.authMethod,'browser-isolated-cookie');assert.equal(value.complete,true);
+ assert.equal(value.sessionCookieVerified,true);assert.equal(value.trophyAccessVerified,true);
+ assert.equal(calls.length,5);assert.equal(value.authRequests.length,4);assert.equal(value.requests.length,1);
+ assert.equal(calls[0].cookie,undefined);assert.notEqual(calls[0].anonymous,true);
+ for(const c of calls.slice(1,3)){assert.equal(c.anonymous,true);assert.equal(c.redirect,'manual');assert.equal(c.cookie,'npsso='+'a'.repeat(64));assert.equal(c.headers?.Cookie,undefined);}
+ assert.equal(new URL(calls[1].url).pathname,'/api/v1/ssocookie');
+ assert.equal(new URL(calls[2].url).pathname,'/api/authz/v3/oauth/authorize');
+ assert.equal(calls[3].cookie,undefined);assert.equal(calls[3].anonymous,true);assert.equal(calls[3].method,'POST');
+ assert.equal(calls[4].url,'https://m.np.playstation.com/api/trophy/v1/users/me/trophyTitles?limit=1&offset=0');
+ assert.equal(value.recentSample.length,1);assert.equal(value.byTitle.length,0);assert.equal(messages.length,0);
+ assert.equal(api.getToken(),'');assert.equal(api.getBusy(),false);
+ assert.equal(value.authRequests[1].anonymous,true);assert.equal(value.authRequests[2].explicitSessionCookie,true);
+ assert.ok(calls.every(c=>['https://ca.account.sony.com','https://m.np.playstation.com'].includes(new URL(c.url).origin)));
+ for(const secret of ['a'.repeat(64),'PRIVATE_'])assert.equal(JSON.stringify(value).includes(secret),false);
+});
+
+test('browser-only candidate stops if Sony cannot confirm the explicitly supplied session and never falls back',async()=>{
+ for(const invalid of [{npsso:'b'.repeat(64)},{},null]){
+  const replies=browserAuthResponses();replies[1]={responseText:JSON.stringify(invalid)};
+  const {api,calls}=setup(replies);await api.runBrowserAuthProbe('browser-isolated');const value=api.report();
+  assert.equal(calls.length,2);assert.equal(value.complete,false);assert.equal(value.sessionCookieVerified,false);
+  assert.equal(value.trophyAccessVerified,false);assert.equal(value.requests.length,0);assert.equal(api.getToken(),'');
+ }
+});
+
+test('browser-only candidate stops on each HTTP or network failure without retries or partial success',async()=>{
+ for(let index=0;index<5;index++)for(const failure of [{status:401},{status:403},{status:429},{event:'error',status:408,statusText:'Failed to fetch PRIVATE_ERROR'}]){
+  const replies=browserAuthResponses();replies[index]=failure;const {api,calls,messages}=platinumSetup(replies);
+  await api.runBrowserAuthProbe('browser-isolated');const value=api.report();assert.equal(calls.length,index+1);
+  assert.equal(value.complete,false);assert.equal(value.trophyAccessVerified,false);assert.equal(messages.length,0);
+  assert.equal(api.getToken(),'');assert.equal(api.getBusy(),false);assert.equal(JSON.stringify(value).includes('PRIVATE_'),false);
+ }
+});
+
+test('browser-only candidate aborts at every stage and prevents a second operation while busy',async()=>{
+ for(let index=0;index<5;index++){
+  const replies=browserAuthResponses();replies[index].delayMs=40;const {api,calls,messages}=platinumSetup(replies);
+  const pending=api.runBrowserAuthProbe('browser-isolated');await api.runBrowserAuthProbe('browser-isolated');await api.runAuthChecks();
+  while(calls.length<index+1)await new Promise(setImmediate);
+  api.stop();await pending;const value=api.report();
+  assert.equal(calls.length,index+1);assert.equal(value.complete,false);assert.equal(value.stopReason,'cancelled');
+  assert.equal(value.trophyAccessVerified,false);assert.equal(messages.length,0);assert.equal(api.getToken(),'');
+ }
+});
+
+test('browser-only candidate rejects malformed or oversized trophy responses and accepts a valid empty list',async()=>{
+ for(const trophyTitles of [undefined,{},[trophy,trophy],[{}]]){
+  const replies=browserAuthResponses();replies[4]={responseText:JSON.stringify({trophyTitles})};
+  const {api,calls}=setup(replies);await api.runBrowserAuthProbe('browser-isolated');
+  assert.equal(calls.length,5);assert.equal(api.report().complete,false);assert.equal(api.report().trophyAccessVerified,false);assert.equal(api.getToken(),'');
+ }
+ const replies=browserAuthResponses();replies[4]={responseText:'{"trophyTitles":[]}'};const {api}=setup(replies);
+ await api.runBrowserAuthProbe('browser-isolated');assert.equal(api.report().complete,true);assert.equal(api.report().trophyAccessVerified,true);assert.equal(api.report().recentSample.length,0);
+});
+
+test('session cookie verification is limited to anonymous manual Sony requests',()=>{
+ const {api}=setup();for(const options of [{cookie:'npsso='+'a'.repeat(64)}, {redirect:'manual',cookie:'npsso='+'a'.repeat(64)}, {redirect:'manual',anonymous:true,cookie:'npsso=bad'}])assert.throws(()=>api.request('https://ca.account.sony.com/api/v1/ssocookie',options));
+});
+
+function directTokenResponses(){return [browserAuthResponses()[0],browserAuthResponses()[3],browserAuthResponses()[4]];}
+
+test('direct SSO token probe uses only three Sony requests, never calls authorize and never writes manager results',async()=>{
+ const {api,calls,messages}=platinumSetup(directTokenResponses());api.setToken('PRIVATE_OLD_TOKEN');
+ assert.equal(calls.length,0);await api.runBrowserAuthProbe();const value=api.report();
+ assert.equal(value.authMethod,'browser-sso-token');assert.equal(value.complete,true);
+ assert.equal(value.sessionReadVerified,true);assert.equal(value.tokenExchangeVerified,true);assert.equal(value.trophyAccessVerified,true);
+ assert.equal(calls.length,3);assert.equal(value.authRequests.length,2);assert.equal(value.requests.length,1);
+ assert.equal(calls[0].url,'https://ca.account.sony.com/api/v1/ssocookie');
+ assert.equal(calls[1].url,'https://ca.account.sony.com/api/authz/v3/oauth/token');assert.equal(calls[1].method,'POST');
+ const form=new URLSearchParams(calls[1].data);
+ assert.deepEqual([...form.keys()].sort(),['grant_type','npsso','scope','token_format']);
+ assert.equal(form.get('grant_type'),'sso_token');assert.equal(form.get('npsso'),'a'.repeat(64));
+ assert.equal(form.get('scope'),'psn:mobile.v2.core psn:clientapp');assert.equal(form.get('token_format'),'jwt');
+ assert.equal(calls[1].anonymous,true);assert.equal(calls[1].redirect,'manual');assert.equal(calls[1].cookie,undefined);
+ assert.match(calls[1].headers.Authorization,/^Basic /);assert.equal(calls[1].headers['Content-Type'],'application/x-www-form-urlencoded');
+ assert.equal(calls[2].url,'https://m.np.playstation.com/api/trophy/v1/users/me/trophyTitles?limit=1&offset=0');
+ assert.equal(calls[2].headers.Authorization,'Bearer PRIVATE_ACCESS');assert.equal(calls[2].cookie,undefined);
+ assert.equal(value.authRequests[1].grantType,'sso_token');assert.equal(value.recentSample.length,1);
+ assert.equal(messages.length,0);assert.equal(api.getToken(),'');assert.equal(api.getBusy(),false);
+ for(const secret of ['a'.repeat(64),'PRIVATE_'])assert.equal(JSON.stringify(value).includes(secret),false);
+});
+
+test('direct token grant exports only safe OAuth error codes and never falls back to app redirects',async()=>{
+ for(const error of ['invalid_grant','unauthorized_client','unsupported_grant_type','PRIVATE_ERROR']){
+  const replies=directTokenResponses();replies[1]={status:400,responseText:JSON.stringify({error,error_description:'PRIVATE_DESCRIPTION',npsso:'a'.repeat(64)})};
+  const {api,calls}=setup(replies);await api.runBrowserAuthProbe();const value=api.report();
+  assert.equal(calls.length,2);assert.equal(value.complete,false);assert.equal(value.tokenExchangeVerified,false);
+  assert.equal(value.authRequests[1].oauthError,error==='PRIVATE_ERROR'?'other':error);assert.equal(value.requests.length,0);
+  assert.equal(JSON.stringify(value).includes('PRIVATE_'),false);assert.equal(api.getToken(),'');
+ }
+});
+
+test('direct token probe stops on every HTTP or network failure and cancellation without subsequent requests',async()=>{
+ for(let index=0;index<3;index++)for(const failure of [{status:401},{status:403},{status:429},{event:'error',status:408,statusText:'Failed to fetch PRIVATE_ERROR'}]){
+  const replies=directTokenResponses();replies[index]=failure;const {api,calls,messages}=platinumSetup(replies);
+  await api.runBrowserAuthProbe();assert.equal(calls.length,index+1);assert.equal(api.report().complete,false);
+  assert.equal(api.report().trophyAccessVerified,false);assert.equal(messages.length,0);assert.equal(api.getToken(),'');
+ }
+ for(let index=0;index<3;index++){
+  const replies=directTokenResponses();replies[index].delayMs=40;const {api,calls}=setup(replies);
+  const pending=api.runBrowserAuthProbe();await api.runBrowserAuthProbe();await api.runAuthChecks();
+  while(calls.length<index+1)await new Promise(setImmediate);
+  api.stop();await pending;assert.equal(calls.length,index+1);assert.equal(api.report().stopReason,'cancelled');assert.equal(api.getToken(),'');
+ }
+});
+
+test('direct token probe rejects missing sessions, invalid tokens and malformed trophy results',async()=>{
+ for(const [index,responseText] of [[0,'{}'],[0,'null'],[1,'null'],[1,'{"access_token":"PRIVATE_ACCESS","expires_in":0}'],[1,'{"expires_in":3600}'],[1,'<html>PRIVATE_ERROR</html>'],[2,'{"trophyTitles":[{},{}]}'],[2,'{}']]){
+  const replies=directTokenResponses();replies[index]={responseText};const {api,calls}=setup(replies);
+  await api.runBrowserAuthProbe();assert.equal(calls.length,index+1);assert.equal(api.report().complete,false);assert.equal(api.getToken(),'');
+  assert.equal(JSON.stringify(api.report()).includes('PRIVATE_'),false);
+ }
+ const replies=directTokenResponses();replies[2]={responseText:'{"trophyTitles":[]}'};const {api}=setup(replies);
+ await api.runBrowserAuthProbe();assert.equal(api.report().complete,true);assert.equal(api.report().trophyAccessVerified,true);assert.equal(api.getToken(),'');
+});
+
+test('the browser summary research path also uses SSO token exchange and preserves its bounded trophy queries',async()=>{
+ const {api,calls}=setup([...directResponses(),{responseText:JSON.stringify({titles:[{npTitleId:sample.titleId,trophyTitles:[trophy]}]})},{responseText:JSON.stringify({trophyTitles:[trophy]})},{responseText:JSON.stringify({definedTrophies:counts})}]);
+ api.setSamples([sample]);await api.runProbe('browser-sso-token');const value=api.report();
+ assert.equal(value.complete,true);assert.equal(value.authMethod,'browser-sso-token-summary');
+ assert.equal(calls.length,5);assert.equal(value.requests.length,3);assert.equal(value.authRequests.length,2);
+ assert.equal(value.authRequests[1].grantType,'sso_token');assert.equal(value.byTitle[0].status,'matched');
+ assert.ok(calls.every(c=>new URL(c.url).protocol==='https:'&&!new URL(c.url).pathname.endsWith('/authorize')));
+ assert.equal(JSON.stringify(value).includes('PRIVATE_'),false);
 });

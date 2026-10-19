@@ -42,6 +42,9 @@
 - 2026-10-19 已獲授權加入「同步白金標記」：只在使用者點擊時查詢現有有效庫作品；任一已知 PS4／PS5 版本的 `earnedTrophies.platinum > 0` 即補標 `已白金`（可取代追蹤／忽略）。既有白金、未對應、尚未白金均不動；不新增遊戲、不查規格作白金判定、不更動分類／標籤／筆記／Drive。研究模式仍限 5 個版本；管理頁正式同步則依本次庫版本分批，每次最多 5 個 ID。2026-10-19 使用者實測單次 10／15 個均 400，並授權採兩批並行、零間隔；失敗停止後續派送、不重試、不套用部分結果。整合升級須提示停用舊的獨立獎盃腳本。
 - 2026-10-19 使用者要求正式白金同步免助手：v0.4.1 預設瀏覽器直接授權，以 GM cookie 選項將 NPSSO 僅傳固定 Sony authorize 端點，manual redirect 驗證 code 後交換 token；不自動回退至 localhost。2026-10-19 已收到 Chrome／Tampermonkey 5.5.1 實測：登入資料讀取 200，授權碼步驟仍 network／408／failed-to-fetch、無 code，獎盃請求 0；不能宣稱已解決或可取代助手。保留明確選用的研究助手模式作備援比對。
 - 使用者明確要求只保留 Tampermonkey，不新增專用 Chrome 擴充套件，也不以常駐助手代替。v0.4.2 授權傳輸診斷僅手動執行，最多 4 個固定 Sony 對照請求（一般／Fetch／manual 的 ssocookie、anonymous manual authorize），不交換 token、不查獎盃、不連助手、不寫存檔；network 可繼續不同對照組，401／403／429 或取消停止。不得把診斷完成當成授權成功。
+- 2026-10-19 使用者授權下一步純 Tampermonkey 小範圍測試：v0.4.3「測試免助手授權（只查 1 筆）」至多 5 個 Sony 請求（登入讀取、anonymous 單一 npsso 的 ssocookie 一致性驗證、同選項 authorize、token、最近一筆獎盃）。不改既有 client／scope／redirect，不刪 Cookie、不自動回退、不重試、失敗／取消即停；無管理頁結果或標記寫入，所有結束路徑清除暫存 token。依 TM 同名 Cookie 問題的建議驗證，尚未證明為本案根因；正式白金流程需待 Chrome 成功後再決定接回。
+- v0.4.3 Chrome 實測獨立 Cookie 驗證通過、authorize 仍 network／408，不能再將該候選宣稱已修通。v0.4.4 下一步改測有社群原始碼依據的 sso_token 直接 grant：最多 3 次（ssocookie、同 client／scope 的固定 Sony token POST、最近一筆獎盃），不呼叫 authorize、不依賴 App 轉址、不換 client 或擴權。NPSSO 僅在 Sony token POST 本文暫存，不匯出；只記錄安全 grantType／白名單 oauthError。失敗／取消即停、不重試或回退、不回傳標記，所有結束清除 token；正式同步需真實成功後再整合。
+- 2026-10-19 14:33 使用者提供 v0.4.4 真實成功結果：登入／sso_token／單筆獎盃皆 200，complete 與三個驗證布林皆 true。v0.4.5 正式白金及一般研究摘要改用已驗證的 browser-sso-token，不依賴助手或 authorize App 轉址；仍按鈕觸發、5 ID／兩批並行、原資料保護及整輪完成才套用。小範圍授權成功不等於免助手全庫補標已驗收，後者仍需區分；不恢復要求啟動助手的正式操作提示。
 - 暫時授權助手只監聽 `127.0.0.1:4176`，僅使用者選擇助手模式才傳送暫存授權資料；保留固定 Sony 上游、nonce、來源檢查、請求上限與逾時。不得暴露到區域網路、發布成公開服務或關閉 TLS 驗證。
 
 ## Git、commit 與發布
