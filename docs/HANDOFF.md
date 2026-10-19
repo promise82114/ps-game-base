@@ -1,6 +1,25 @@
 # 換機交接與執行進度
 
-更新日期：2026-10-18（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
+更新日期：2026-10-19（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
+
+## 2026-10-19 匯出檔名補時分
+
+- 管理頁所有 JSON 匯出、數位庫腳本 JSON／CSV、獎盃測試 JSON 的檔名統一採瀏覽器本機時間 `YYYY-MM-DD_HH-mm`，例如 `ps-game-base-backup-2026-10-19_14-35.json`。使用安全分隔符，不含 Windows 禁用的冒號。
+- 數位庫腳本更新至 v0.2.3、白金／獎盃腳本至 v0.2.1；已安裝的 Tampermonkey 腳本須更新才會採用新檔名。原始 tampermonkey-scripts repo 不動。
+- 僅改下載命名與版本資訊，JSON 內 ISO 時間、資料內容、分類、同步及 Drive 檔名不變；與白金同步功能一併依使用者要求提交並推送 main，結果以 Git 遠端核對為準。
+- 驗證：三個匯出入口的時間格式與補零檢查、語法及 diff 檢查通過，完整 Node 測試仍為 141 項通過。
+
+## 2026-10-19 手動同步白金標記
+
+- 使用者已確認需求並授權實作：以現有有效數位庫作品為範圍，任一已知 PS4／PS5 版本已取得白金即補標；保留既有白金、未對應及尚未白金項目。可取代追蹤／忽略，其他整理資料不動。
+- 使用者提供 v0.1.5 真實測試報告，`complete: true`，本機助手授權及三個獎盃 API 全數 HTTP 200，證實這條授權與查詢路徑可行。私人報告不加入 repo。
+- 新版 v0.2.0 沿用同一獎盃腳本，新增 manager 橋接模式；按「同步白金標記」才開官方分頁、指定 ID 並分批查詢。正式數位庫腳本維持 v0.2.2，不需變更；研究模式仍可使用。
+- 正向結果只更新作品 `status: 已白金` 與 `updatedAt`，保留其他欄位、legacy records 與原始庫。操作前備份、跨分頁防覆寫、來源／session／ID 驗證均保留；不寫 Drive。取消或一般錯誤不套用，404 批次略過。
+- 有效範圍依現有庫的 `missingIds`／`isActive` 判斷，不新增商品或目錄查詢，不改既有清單顯示。現有資料無可靠對應的版本不以名稱硬配；同組歷史版本可識別仍有有效授權作品的白金。
+- 本次提交前基準 `7f2e679`（main）。提交包含：`AGENTS.md`、`README.md`、本交接文件、`docs/trophy-probe.md`、`dist/app.js`、`dist/index.html`、`dist/platinum.js`、數位庫與獎盃 userscript、`tests/platinum.test.mjs`、`tests/sync-ui.test.mjs`、`tests/trophy-probe.test.cjs`。新提交 hash 以 `git log -1` 核對。
+- 完整 Node 測試 **141 項通過，0 失敗、0 跳過**；包含跨版本補標、未對應／已白金不動、metadata 保留、授權與批次、可信訊息、停止、錯誤、儲存失敗與重新載入。全部使用合成資料。
+- 真實瀏覽器以獨立來源 `127.0.0.1:4177` 檢查按鈕、空庫不啟動、示範模式不啟動、設定對話框的腳本入口與助手說明。2026-10-19 使用者另完成新版 Chrome／Tampermonkey 同步操作，回覆「完成，看到新增白金筆數」，作為實際帳號回傳與同步完成的驗收紀錄；未提供具體筆數。
+- 本次功能已實作並獲使用者回報同步完成，使用者後續已要求 commit／push。日後使用白金功能至少需 v0.2.0；目前最新 v0.2.1 另含匯出檔名時分。須啟動同電腦 4176 助手（15 分鐘後停止接收連線）；程式碼更新不會自動更新 Tampermonkey。
 
 ## 2026-10-18 遊戲庫全量顯示
 
@@ -15,8 +34,7 @@
 ## 先看這裡
 
 - 遊戲庫、分類、版本合併、JSON／Drive 差異比較已有實作；程式直接位於 `dist/`，沒有建置步驟。
-- 獎盃仍是獨立小範圍研究。已能攔截數位庫清單、取得 Sony 登入工作階段，但瀏覽器取得授權碼失敗，**尚未取得任何真實獎盃結果**。
-- 最新 probe 為 **0.1.5**，新增本機授權助手，**待 Chrome 真實帳號測試**。不要把模擬測試或 Sony 工作階段 HTTP 200 當成獎盃查詢成功。
+- 本機助手模式已取得真實獎盃結果；最新版 **0.2.1** 已加入管理頁手動補標白金，使用者已回報 Chrome 同步完成並看到新增白金筆數。瀏覽器直接授權路徑仍未驗證成功。
 - **獎盃腳本、助手、對應測試及說明隨本次交接提交納入版本管理。** 新電腦取得本次提交後即可接續；最新 hash 請以 `git log -1` 核對。
 - 更換電腦還需要另行搬移個人 JSON；Git 不包含瀏覽器存檔、Chrome／Sony 登入狀態或已安裝的 Tampermonkey 版本。
 
@@ -24,12 +42,12 @@
 
 | 項目 | 交接時狀態 |
 | --- | --- |
-| 本機 repo | `G:\git\ps-game-base` |
+| 本機 repo | `D:\gitp\ps-game-base` |
 | 分支 | `main` |
-| 本次工作基準 HEAD | `8d52872a837a0f8cb27c5abf9f3559bc31f14129` |
-| 基準提交 | `feat: 保存獎盃測試工具與換機交接文件` |
+| 本次工作基準 HEAD | `7f2e679` |
+| 基準提交 | `feat: 移除遊戲庫分頁並全量顯示作品` |
 | origin | `https://github.com/promise82114/ps-game-base.git` |
-| 遠端／部署 | 本次已獲授權提交並推送 main；完成與否以 Git／Actions 核對及操作回報為準 |
+| 遠端／部署 | 本次已獲授權提交並推送 main；Git 遠端提交與 Pages 部署結果分別核對 |
 
 近期已提交的里程碑：
 
@@ -71,8 +89,8 @@
 | `dist/model.js` | 白名單解析、遊戲分組、分類及個人資料 |
 | `dist/sync.js` | 差異比較、衝突選擇與合併模型 |
 | `dist/shared/google-auth.js`、`drive-appdata.js` | Google 暫存授權與 Drive appData 備份 |
-| `dist/scripts/ps-game-base.user.js` | 正式遊戲庫撈取副本，v0.2.2 |
-| `dist/scripts/ps-game-base-trophy-probe.user.js` | 獨立獎盃 probe，v0.1.5，尚未整合正式流程 |
+| `dist/scripts/ps-game-base.user.js` | 正式遊戲庫撈取副本，v0.2.3 |
+| `dist/scripts/ps-game-base-trophy-probe.user.js` | v0.2.1，手動白金同步及獨立獎盃研究 |
 | `tools/trophy-auth-helper.mjs` | 獎盃研究專用暫時服務，不隨 Pages 執行 |
 | `tests/` | Node 測試，包含模型、合成 DOM、腳本、Drive 與助手 |
 | `server.mjs` | 本機靜態伺服器，預設 127.0.0.1:4175 |
@@ -90,7 +108,9 @@
 
 原始 userscript 參考位置為 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js`，本 repo 副本獨立開發；Google 連接參考 `D:\gitp\edfwb2-checklist`。一般啟動不需要這兩個相鄰 repo，不要把本次修改自動寫回它們。
 
-## 獎盃研究進度與卡點
+## 獎盃研究進度與卡點（2026-10-17 歷史快照）
+
+本節保留初次研究的背景；2026-10-19 的成功結果與新功能請以文件頂端為準。
 
 目標：在取得數位庫時得知獎盃總數，尤其「有沒有白金」；另可呈現帳號已取得數量、進度與已取得白金。**有白金規格和個人已白金是兩件事。**
 
@@ -155,7 +175,7 @@ npm start
 
 開啟 [本機遊戲庫](http://127.0.0.1:4175/)，透過完整備份預覽後匯入。原有本機／localhost／Pages 的 localStorage 是分開的，即使網址相同，新電腦也沒有舊瀏覽器資料。
 
-正式同步安裝本 repo 的 `dist/scripts/ps-game-base.user.js` **0.2.2**；獎盃研究另安裝 `dist/scripts/ps-game-base-trophy-probe.user.js` **0.1.5**。磁碟檔更新不會自動讓 Tampermonkey 採用新版，須更新已安裝腳本並重新整理 Sony 頁面。自行在 Chrome 登入 Sony，不複製／索取 Cookie 或 token。
+正式同步安裝本 repo 的 `dist/scripts/ps-game-base.user.js` **0.2.3**；白金同步／獎盃研究另安裝 `dist/scripts/ps-game-base-trophy-probe.user.js` **0.2.1**。磁碟檔更新不會自動讓 Tampermonkey 採用新版，須更新已安裝腳本並重新整理 Sony 頁面。自行在 Chrome 登入 Sony，不複製／索取 Cookie 或 token。
 
 獎盃研究另開終端執行：
 

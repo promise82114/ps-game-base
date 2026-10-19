@@ -6,6 +6,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import * as model from '../dist/model.js';
 import * as sync from '../dist/sync.js';
+import * as platinum from '../dist/platinum.js';
 const KEY='ps-game-base.v1',RECOVERY=KEY+'.before-import';
 const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
 const source=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'');
@@ -33,10 +34,10 @@ function setup(initial=fixture()){
  const storage=new Map([[KEY,JSON.stringify(initial)]]),windowEvents={},io={reads:0,writes:[],remote:null,writeError:null,failKey:null};
  class Auth{get connected(){return true;}disconnect(){} }
  class Drive{async read(){io.reads++;return structuredClone(io.remote);}async write(value,expected){if(io.writeError)throw Error(io.writeError);io.writes.push({value,expected});}}
- const context={...model,...sync,console,structuredClone,Blob,URL,crypto:{randomUUID:()=> 'test'},setTimeout:()=>1,clearTimeout(){},confirm:()=>true,
+ const context={...model,...sync,...platinum,console,structuredClone,Blob,URL,URLSearchParams,crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000001'},setTimeout(callback,ms){io.timers??=[];io.timers.push({callback,ms});return io.timers.length;},clearTimeout(){},confirm:()=>true,
   icon:()=>new Node('svg'),document:{getElementById:id=>nodes.get(id),createElement:tag=>new Node(tag),createTextNode:text=>text,querySelectorAll:()=>[]},
   localStorage:{getItem:key=>storage.get(key)||null,setItem(key,value){if(key===io.failKey)throw Error('quota');storage.set(key,value);}},
-  window:{SideProjectAuth:{GoogleAuth:Auth},SideProjectDrive:{DriveAppData:Drive},addEventListener:(name,cb)=>{windowEvents[name]=cb;}},location:{origin:'http://test.invalid'}};
+  window:{SideProjectAuth:{GoogleAuth:Auth},SideProjectDrive:{DriveAppData:Drive},open(url){if(io.popupBlocked)return null;io.opened={url,messages:[],postMessage(message,origin){this.messages.push({message,origin});}};return io.opened;},addEventListener:(name,cb)=>{const before=windowEvents[name];windowEvents[name]=event=>{before?.(event);cb(event);};}},location:{origin:'http://test.invalid'}};
  vm.createContext(context);vm.runInContext(source+'\nglobalThis.appTest={preview,getState:()=>state,getPending:()=>pendingImport};',context);
  return {nodes,storage,io,windowEvents,app:context.appTest};
 }
@@ -119,4 +120,51 @@ test('another tab changing storage blocks both import and cloud writes',async()=
 test('changed local content invalidates the old preview and resets conflict choices',async()=>{
  const {nodes,storage,app}=setup(),before=storage.get(KEY);app.preview(fixture('cloud'),'cloud');nodes.get('choose-incoming').onclick();app.getState().personal.works['concept:a'].note='new local';await nodes.get('confirm-import').onclick();
  assert.equal(app.getState().personal.works['concept:a'].note,'new local');assert.equal(storage.get(KEY),before);assert.equal(Object.keys(app.getPending().choices).length,0);assert.match(nodes.get('import-notice').textContent,/已重新比較/);
+});
+
+const platinumFixture=()=>{
+ const data=fixture('keep note',['a','b']);data.library.games.forEach((g,i)=>{g.titleId='PPSA0000'+(i+1)+'_00';});
+ data.personal.works['concept:a'].status='想玩';data.personal.works['concept:a'].tags=['keep tag'];return data;
+};
+function startPlatinum(env){
+ env.nodes.get('sync-platinum').onclick();const child=env.io.opened;
+ const session=new URLSearchParams(new URL(child.url).hash.slice(1)).get('psgbPlatinumSession');
+ const send=data=>env.windowEvents.message({source:child,origin:'https://library.playstation.com',data:{session,...data}});
+ send({type:'PSGB_PLATINUM_READY'});return {child,session,send};
+}
+test('platinum sync is click-only, requires a trusted handshake, applies only status and survives reload',()=>{
+ const env=setup(platinumFixture()),before=structuredClone(env.app.getState());assert.equal(env.io.opened,undefined);
+ const {child,send,session}=startPlatinum(env);assert.equal(child.messages.length,1);assert.equal(child.messages[0].message.type,'PSGB_PLATINUM_START');
+ assert.equal(new URLSearchParams(new URL(child.url).hash.slice(1)).has('psgbOrigin'),false);
+ const result={type:'PSGB_PLATINUM_RESULT',session,complete:true,earnedTitleIds:['PPSA00001_00']};
+ for(const change of [{origin:'https://untrusted.invalid'},{source:{}},{data:{...result,session:'wrong'}}])env.windowEvents.message({origin:'https://library.playstation.com',source:child,data:result,...change});
+ assert.equal(env.app.getState().personal.works['concept:a'].status,'想玩');
+ env.app.getState().personal.works['concept:a'].note='edited while querying';send(result);
+ const after=env.app.getState();assert.equal(after.personal.works['concept:a'].status,'已白金');assert.equal(after.personal.works['concept:a'].note,'edited while querying');assert.deepEqual([...after.personal.works['concept:a'].tags],['keep tag']);assert.deepEqual(structuredClone(after.library),before.library);
+ assert.equal(env.nodes.get('stat-platinum').textContent,1);assert.match(env.nodes.get('notice').textContent,/新增 1 部/);assert.equal(env.storage.has(RECOVERY),true);assert.equal(env.io.writes.length,0);
+ const reloaded=setup(JSON.parse(env.storage.get(KEY)));assert.equal(reloaded.app.getState().personal.works['concept:a'].status,'已白金');assert.equal(reloaded.io.opened,undefined);
+});
+test('empty platinum results and repeated late messages do not write or clear existing platinum',()=>{
+ const data=platinumFixture();data.personal.works['concept:b']={...model.blankRecord(),status:'已白金',updatedAt:'keep'};
+ const env=setup(data),before=env.storage.get(KEY),{send}=startPlatinum(env);send({type:'PSGB_PLATINUM_RESULT',complete:true,earnedTitleIds:[]});
+ assert.equal(env.storage.get(KEY),before);assert.equal(env.storage.has(RECOVERY),false);send({type:'PSGB_PLATINUM_RESULT',complete:true,earnedTitleIds:['PPSA00001_00']});assert.equal(env.storage.get(KEY),before);
+});
+test('platinum sync handles blocked popup, helper failure, invalid response and demo without writes',()=>{
+ const blocked=setup(platinumFixture());blocked.io.popupBlocked=true;blocked.nodes.get('sync-platinum').onclick();assert.equal(blocked.nodes.get('sync-platinum').disabled,false);assert.match(blocked.nodes.get('notice').textContent,/彈出視窗/);
+ for(const message of [{type:'PSGB_PLATINUM_ERROR',code:'helper'},{type:'PSGB_PLATINUM_RESULT',complete:false,earnedTitleIds:['PPSA00001_00']},{type:'PSGB_PLATINUM_RESULT',complete:true,earnedTitleIds:['PPSA99999_00']}]){
+  const env=setup(platinumFixture()),before=env.storage.get(KEY),{send}=startPlatinum(env);send(message);assert.equal(env.storage.get(KEY),before);assert.equal(env.nodes.get('sync-platinum').disabled,false);
+ }
+ const demo=setup();demo.nodes.get('demo').onclick();demo.nodes.get('sync-platinum').onclick();assert.equal(demo.io.opened,undefined);
+});
+test('platinum sync storage, recovery and external-tab failures preserve memory and saved data',()=>{
+ for(const failure of ['storage','recovery','external']){
+  const env=setup(platinumFixture()),before=env.storage.get(KEY),{send}=startPlatinum(env);
+  if(failure==='external')env.windowEvents.storage({key:KEY});else env.io.failKey=failure==='storage'?KEY:RECOVERY;
+  send({type:'PSGB_PLATINUM_RESULT',complete:true,earnedTitleIds:['PPSA00001_00']});assert.equal(env.storage.get(KEY),before);assert.equal(env.app.getState().personal.works['concept:a'].status,'想玩');
+ }
+});
+test('timeout restores the button even if the official popup is already closed',()=>{
+ const env=setup(platinumFixture()),before=env.storage.get(KEY);startPlatinum(env);
+ env.io.opened.postMessage=()=>{throw Error('closed');};env.io.timers.find(timer=>timer.ms===300000).callback();
+ assert.equal(env.nodes.get('sync-platinum').disabled,false);assert.equal(env.storage.get(KEY),before);assert.match(env.nodes.get('notice').textContent,/逾時/);
 });

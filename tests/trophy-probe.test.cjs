@@ -5,20 +5,20 @@ const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../dist/scripts/ps-game-base-trophy-probe.user.js'),'utf8');
 const counts={bronze:30,silver:10,gold:3,platinum:1};
 const trophy={npCommunicationId:'NPWR00001_00',npServiceName:'trophy2',trophyTitleName:'Test game',trophyTitlePlatform:'PS5',definedTrophies:counts,earnedTrophies:{bronze:3,silver:0,gold:0,platinum:0},progress:4,lastUpdatedDateTime:'2026-10-17T00:00:00Z'};
-function setup(responses=[],browser={}){
+function setup(responses=[],browser={},hash=''){
  const calls=[],nodes=new Map();
  const node=()=>({children:[],checked:true,disabled:false,append(...n){this.children.push(...n);},replaceChildren(...n){this.children=n;},setAttribute(){}});
  const root={getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);}};
  function XHR(){}XHR.prototype.open=function(){};XHR.prototype.send=function(){};
  const context={URL,URLSearchParams,Map,Set,WeakMap,Date,Headers,Blob,Number,Error,Promise,setTimeout,clearTimeout,
-  location:{href:'https://library.playstation.com/recently-purchased'},
+  location:{href:'https://library.playstation.com/recently-purchased',hash},
   window:{fetch:async()=>({clone:()=>({json:async()=>({})})}),XMLHttpRequest:XHR},
   document:{body:null,addEventListener(){},createElement:node,createTextNode:text=>text},
   GM_info:{scriptHandler:'Tampermonkey',version:'test-version'},
   GM_xmlhttpRequest(options){calls.push(options);const next=responses.shift();if(next?.event==='throw')throw Error('PRIVATE_EXCEPTION');let aborted=false;const handle={abort(){aborted=true;options.onabort();}};setImmediate(()=>{if(aborted)return;if(!next||next.event==='error')options.onerror(next);else options.onload({status:200,responseHeaders:'',...next});});return handle;}};
  Object.defineProperties(context.window,Object.getOwnPropertyDescriptors(browser));
  vm.createContext(context);
- const exposed=source.replace(/\}\)\(\);\s*$/,'globalThis.probe={accessCode,requestUrl,report,getCapture:()=>capture,getPage:()=>page,summarize,sampleGames,libraryResponse,runProbe,stop,authorize,request,setRoot(v){root=v;},setToken(v){token=v;expires=Date.now()+60000;},setSamples(games){samples=new Map(games.map(g=>[g.titleId,g]));selected=new Set(games.map(g=>g.titleId));},getResult:()=>result,getToken:()=>token,getSamples:()=>[...samples.values()]};})();');
+ const exposed=source.replace(/\}\)\(\);\s*$/,'globalThis.probe={syncPlatinum,getBusy:()=>busy,accessCode,requestUrl,report,getCapture:()=>capture,getPage:()=>page,summarize,sampleGames,libraryResponse,runProbe,stop,authorize,request,setRoot(v){root=v;},setToken(v){token=v;expires=Date.now()+60000;},setSamples(games){samples=new Map(games.map(g=>[g.titleId,g]));selected=new Set(games.map(g=>g.titleId));},getResult:()=>result,getToken:()=>token,getSamples:()=>[...samples.values()]};})();');
  vm.runInContext(exposed,context);context.probe.setRoot(root);return {api:context.probe,calls,nodes};
 }
 const sample={titleId:'PPSA12345_00',name:'Test game',platform:'PS5'};
@@ -72,7 +72,7 @@ test('HTML response is an error and cannot be interpreted as an empty trophy lis
 
 test('initial session network failure records the previously missing diagnostic without leaking callback details',async()=>{
  const {api}=setup([{event:'error',status:0,finalUrl:'https://ca.account.sony.com/api/v1/ssocookie?token=PRIVATE_TOKEN',responseText:'PRIVATE_COOKIE',error:'PRIVATE_ERROR'}]);api.setSamples([sample]);await api.runProbe();
- const result=api.getResult();assert.equal(result.probeVersion,'0.1.5');assert.equal(result.manager.version,'test-version');assert.equal(result.requests.length,0);assert.equal(result.authRequests.length,1);assert.equal(result.authRequests[0].stage,'sony-session');assert.equal(result.authRequests[0].outcome,'network');assert.equal(result.authRequests[0].status,0);assert.equal(result.authRequests[0].transport,'default');assert.match(result.error,/Sony 登入工作階段/);assert.equal(JSON.stringify(result).includes('PRIVATE_'),false);
+ const result=api.getResult();assert.equal(result.probeVersion,'0.2.1');assert.equal(result.manager.version,'test-version');assert.equal(result.requests.length,0);assert.equal(result.authRequests.length,1);assert.equal(result.authRequests[0].stage,'sony-session');assert.equal(result.authRequests[0].outcome,'network');assert.equal(result.authRequests[0].status,0);assert.equal(result.authRequests[0].transport,'default');assert.match(result.error,/Sony 登入工作階段/);assert.equal(JSON.stringify(result).includes('PRIVATE_'),false);
 });
 test('access code and access token transport failures identify the exact step',async()=>{
  const session={responseText:JSON.stringify({npsso:'a'.repeat(64)})},code={status:302,responseHeaders:'Location: com.scee.psxandroid.scecompcall://redirect/?code=PRIVATE_CODE\r\n'};
@@ -151,4 +151,46 @@ test('invalid helper handshake stops before sending Sony credentials to loopback
 });
 test('helper upstream failure records a whitelisted reason without copying response text',async()=>{
  const {api}=setup([{responseText:JSON.stringify({npsso:'a'.repeat(64)})},{responseText:JSON.stringify({kind:'ps-game-base-local-trophy-auth',nonce:'b'.repeat(48)})},{status:502,responseText:JSON.stringify({error:'access_code',message:'PRIVATE_ERROR'})}]);api.setSamples([sample]);await api.runProbe('helper');const result=api.getResult();assert.equal(result.complete,false);assert.equal(result.authRequests[2].helperError,'access_code');assert.equal(JSON.stringify(result).includes('PRIVATE_ERROR'),false);
+});
+
+const bridgeSession='00000000-0000-4000-8000-000000000001';
+function platinumSetup(responses){
+ let finish;const done=new Promise(resolve=>{finish=resolve;});
+ const messages=[],opener={postMessage(message,origin){messages.push({message,origin});if(['PSGB_PLATINUM_RESULT','PSGB_PLATINUM_ERROR'].includes(message.type))finish();}},events={};
+ const env=setup(responses,{opener,addEventListener:(name,cb)=>{events[name]=cb;}},'#'+new URLSearchParams({psgbPlatinumOrigin:'http://127.0.0.1:4175',psgbPlatinumSession:bridgeSession}));
+ return {...env,messages,opener,events,done};
+}
+const helperResponses=()=>[{responseText:JSON.stringify({npsso:'a'.repeat(64)})},{responseText:JSON.stringify({kind:'ps-game-base-local-trophy-auth',nonce:'b'.repeat(48)})},{responseText:JSON.stringify({accessToken:'PRIVATE_ACCESS',expiresIn:3600})}];
+test('manager platinum sync is dormant, batches by five and returns only earned IDs without credentials',async()=>{
+ const ids=Array.from({length:7},(_,i)=>'PPSA0000'+i+'_00'),env=platinumSetup([...helperResponses(),{responseText:JSON.stringify({titles:[
+  {npTitleId:ids[0],trophyTitles:[{definedTrophies:{platinum:1},earnedTrophies:{platinum:0}}]},
+  {npTitleId:ids[1],trophyTitles:[{earnedTrophies:{platinum:1}}]},
+  {npTitleId:ids[2],trophyTitles:[{earnedTrophies:{platinum:'1'}}]},
+  {npTitleId:'PPSA99999_00',trophyTitles:[{earnedTrophies:{platinum:1},private:'PRIVATE_ACCESS'}]}
+ ]})},{responseText:JSON.stringify({titles:[{npTitleId:ids[6],trophyTitles:[{earnedTrophies:{platinum:1}}]}]})}]);
+ assert.equal(env.calls.length,0);env.events.message({origin:'http://127.0.0.1:4175',source:env.opener,data:{type:'PSGB_PLATINUM_START',session:bridgeSession,titleIds:ids}});await env.done;assert.equal(env.calls.length,5);
+ assert.equal(new URL(env.calls[3].url).searchParams.get('npTitleIds').split(',').length,5);assert.equal(new URL(env.calls[4].url).searchParams.get('npTitleIds').split(',').length,2);
+ const result=env.messages.at(-1);assert.equal(result.origin,'http://127.0.0.1:4175');assert.deepEqual(JSON.parse(JSON.stringify(result.message.earnedTitleIds)),[ids[1],ids[6]]);assert.equal(result.message.complete,true);
+ for(const secret of ['PRIVATE_ACCESS','a'.repeat(64),'b'.repeat(48),'Authorization','earnedTrophies'])assert.equal(JSON.stringify(env.messages).includes(secret),false);
+ assert.equal(env.api.getToken(),'');await env.api.syncPlatinum(ids);assert.equal(env.calls.length,5);
+});
+test('manager sync ignores untrusted messages and does not query through standalone probe buttons',async()=>{
+ const env=platinumSetup([]),data={type:'PSGB_PLATINUM_START',session:bridgeSession,titleIds:[sample.titleId]};
+ for(const change of [{origin:'https://untrusted.invalid'},{source:{}},{data:{...data,session:'wrong'}}])env.events.message({origin:'http://127.0.0.1:4175',source:env.opener,data,...change});
+ env.api.setSamples([sample]);await env.api.runProbe('helper');assert.equal(env.calls.length,0);
+ await env.api.syncPlatinum(['invalid']);assert.equal(env.calls.length,0);assert.equal(env.messages.at(-1).message.code,'input');
+});
+test('manager sync cannot authorize from an untrusted launch origin',()=>{
+ let callback;const opener={postMessage(){throw Error('unexpected');}},env=setup([],{opener,addEventListener:(name,cb)=>{callback=cb;}},'#'+new URLSearchParams({psgbPlatinumOrigin:'https://untrusted.invalid',psgbPlatinumSession:bridgeSession}));
+ callback({origin:'https://untrusted.invalid',source:opener,data:{type:'PSGB_PLATINUM_START',session:bridgeSession,titleIds:[sample.titleId]}});assert.equal(env.calls.length,0);
+});
+test('unknown titles preserve local state; helper and later API failures never send a partial apply result',async()=>{
+ const unknown=platinumSetup([...helperResponses(),{status:404}]);await unknown.api.syncPlatinum([sample.titleId]);assert.equal(unknown.messages.at(-1).message.complete,true);assert.equal(unknown.messages.at(-1).message.earnedTitleIds.length,0);
+ for(const responses of [[helperResponses()[0],{event:'error',status:0}],[...helperResponses(),{status:429,responseText:'PRIVATE_ERROR'}]]){
+  const env=platinumSetup(responses);await env.api.syncPlatinum([sample.titleId]);assert.equal(env.messages.some(m=>m.message.type==='PSGB_PLATINUM_RESULT'),false);assert.equal(env.messages.at(-1).message.type,'PSGB_PLATINUM_ERROR');assert.equal(JSON.stringify(env.messages).includes('PRIVATE_'),false);assert.equal(env.api.getToken(),'');
+ }
+});
+test('stopping manager sync aborts authorization and never applies late results',async()=>{
+ const env=platinumSetup(helperResponses()),pending=env.api.syncPlatinum([sample.titleId]);env.api.stop();await pending;
+ assert.equal(env.messages.some(m=>m.message.type==='PSGB_PLATINUM_RESULT'),false);assert.equal(env.messages.at(-1).message.code,'cancelled');assert.equal(env.api.getToken(),'');
 });

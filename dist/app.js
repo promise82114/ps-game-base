@@ -1,9 +1,11 @@
 import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js';
 import {icon} from './icons.js';
 import {compareImport,resolveImport} from './sync.js';
+import {platinumTitleIds,applyPlatinum} from './platinum.js';
 const $ = id => document.getElementById(id), KEY = 'ps-game-base.v1';
 let state = {library:{schemaVersion:1,complete:false,syncedAt:null,games:[],missingIds:[]},personal:emptyPersonal()}, view='all', category='', selected=new Set(), shown=[], pendingImport=null, demo=false;
 let bridge=null, bridgeTimer, cloudRead=false, cloudBusy=false, prepared=false;
+let platinumBridge=null, platinumTimer;
 let works = new Map();
 function notice(message) {
  for(const id of ['data-notice','import-notice']){$(id).textContent=message;$(id).hidden=false;}
@@ -25,7 +27,11 @@ $('clear-status').onclick=()=>setEditorStatus('未開始');
 function record(id){return workRecordFor(state.personal,works.get(id));}
 function update(id,patch){state.personal.works=Object.assign(Object.create(null),state.personal.works,{[id]:{...record(id),...patch,updatedAt:new Date().toISOString()}});}
 function backup(value=state){return {schemaVersion:1,kind:'ps-game-base-backup',exportedAt:new Date().toISOString(),library:library(value.library),missingIds:value.library.missingIds||[],personal:value.personal};}
-function download(value,name){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=el('a');a.href=url;a.download=`ps-game-base-${name}-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+function exportTimestamp(date=new Date()){
+ const pad=value=>String(value).padStart(2,'0');
+ return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}`;
+}
+function download(value,name){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=el('a');a.href=url;a.download=`ps-game-base-${name}-${exportTimestamp()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function render(){
  const games=groupGames(state.library.games,state.library.missingIds);works=new Map(games.map(g=>[g.key,g]));const records=games.map(g=>record(g.key));
  $('stat-total').textContent=games.length;$('nav-count').textContent=games.length;
@@ -156,6 +162,47 @@ $('confirm-import').onclick=async()=>{
  finally{pending.applying=false;for(const b of buttons)b.disabled=false;if(pendingImport)updateImportEffect();if(uploading){cloudBusy=false;renderCloud();}}
 };
 $('export-library').onclick=()=>{const value=library(state.library),missing=new Set(state.library.missingIds||[]);value.games=value.games.filter(g=>!missing.has(g.entitlementId));download(value,'library');notice(`已匯出 ${value.games.length} 筆遊戲授權（不含個人整理）。`);};$('export-personal').onclick=()=>{download(state.personal,'personal');notice('已匯出個人分類、標籤與筆記。');};$('export-backup').onclick=()=>{download(backup(),'backup');notice('已匯出完整備份，包含遊戲庫與個人整理。');};
+$('sync-platinum').onclick=()=>{
+ if(demo)return notice('請先離開示範模式，再同步白金標記。');
+ if(externalChanged)return notice('另一分頁已更新資料，請先重新整理後再同步白金標記。');
+ if(platinumBridge)return notice('白金同步仍在進行，請查看已開啟的官方分頁。');
+ if(bridge||cloudBusy||pendingImport)return notice('請先完成目前的同步或匯入，再同步白金標記。');
+ const titleIds=platinumTitleIds(state.library,state.personal);
+ if(!titleIds.length)return notice('沒有可補標白金的有效遊戲版本；既有白金與其他資料均未變更。');
+ const session=crypto.randomUUID(),url=new URL('https://library.playstation.com/recently-purchased');
+ url.hash=new URLSearchParams({psgbPlatinumOrigin:location.origin,psgbPlatinumSession:session}).toString();
+ const child=window.open(url.href,'_blank');if(!child)return notice('分頁無法開啟，請允許彈出視窗。');
+ platinumBridge={session,child,titleIds,started:false};setPlatinumBusy(true);waitPlatinum();
+ notice('已開啟官方分頁，等待白金同步腳本。請確認已登入、腳本已更新，且本機獎盃助手正在運作。');
+};
+function setPlatinumBusy(busy){$('sync-platinum').disabled=busy;$('sync-platinum').textContent=busy?'白金同步中…':'同步白金標記';}
+function finishPlatinum(){clearTimeout(platinumTimer);platinumBridge=null;setPlatinumBusy(false);}
+function waitPlatinum(){clearTimeout(platinumTimer);platinumTimer=setTimeout(()=>{try{platinumBridge?.child.postMessage({type:'PSGB_PLATINUM_CANCEL',session:platinumBridge.session},'https://library.playstation.com');}catch{}finishPlatinum();notice('白金同步等待逾時，未變更標記。請確認腳本已更新與本機助手已啟動，再重新點擊同步。');},300000);}
+window.addEventListener('message',event=>{
+ const pending=platinumBridge,msg=event.data;
+ if(!pending||event.origin!=='https://library.playstation.com'||event.source!==pending.child||msg?.session!==pending.session)return;
+ if(msg.type==='PSGB_PLATINUM_READY'){
+  if(pending.started)return;pending.started=true;waitPlatinum();
+  try{pending.child.postMessage({type:'PSGB_PLATINUM_START',session:pending.session,titleIds:pending.titleIds},event.origin);}catch{finishPlatinum();notice('無法連接官方分頁，未變更標記，請重新點擊同步。');}
+ }else if(msg.type==='PSGB_PLATINUM_PROGRESS'){
+  if(!Number.isInteger(msg.checked)||msg.checked<0||msg.checked>pending.titleIds.length)return;
+  waitPlatinum();notice(`白金同步中：已檢查 ${msg.checked} / ${pending.titleIds.length} 個版本…`);
+ }else if(msg.type==='PSGB_PLATINUM_ERROR'){
+  finishPlatinum();notice(msg.code==='helper'?'本機獎盃助手未連線，未變更標記。請啟動 tools/trophy-auth-helper.mjs（15 分鐘後停止接收連線）再重試。':msg.code==='cancelled'?'白金同步已取消，未變更標記。':'白金同步未完成，未變更標記。請查看官方分頁提示後重試。');
+ }else if(msg.type==='PSGB_PLATINUM_RESULT'){
+  finishPlatinum();
+  try{
+   if(msg.complete!==true||!pending.started)throw Error('白金查詢未完整完成，未變更標記。');
+   if(demo||externalChanged||cloudBusy||pendingImport?.applying)throw Error('本機資料或同步狀態已變更，未套用白金。請完成目前操作或重新整理後重試。');
+   const next=applyPlatinum(state,msg.earnedTitleIds,pending.titleIds);
+   if(next.changed){
+    try{saveRecovery();localStorage.setItem(KEY,JSON.stringify(next.state));}catch{throw Error('無法保存白金標記或操作前備份，原本整理保留，請釋放儲存空間後重試。');}
+    state=next.state;storageFailed=false;render();
+   }
+   notice(`白金同步完成：新增 ${next.changed} 部白金標記；既有白金、未對應與尚未取得白金的項目均保留。`);
+  }catch(e){notice(e.message);}
+ }
+});
 $('fetch').onclick=()=>{if(demo)return notice('請先離開示範模式，再更新個人遊戲庫。');if(bridge)return notice('更新分頁仍在等待中，請查看官方分頁；五分鐘後可重新開啟。');const session=crypto.randomUUID();const url=new URL('https://library.playstation.com/recently-purchased');url.hash=new URLSearchParams({psgbOrigin:location.origin,psgbSession:session}).toString();const child=window.open(url.href,'_blank');if(!child)return notice('分頁無法開啟，請允許彈出視窗。');bridge={session,child};notice('請在官方分頁登入並選「已購買」；需先安裝本專案的腳本。');bridgeTimer=setTimeout(()=>{bridge=null;notice('尚未收到資料。請確認腳本已安裝，或從官方分頁匯出 JSON 後匯入。');},300000);};
 window.addEventListener('message',event=>{if(!bridge||event.origin!=='https://library.playstation.com'||event.source!==bridge.child||event.data?.session!==bridge.session)return;const msg=event.data;if(msg.type==='PSGB_STATUS')notice(msg.message);if(msg.type==='PSGB_RESULT'){try{const data=library(msg.payload);if(!data.complete)throw Error('僅接受完整同步回傳；部分結果請手動匯入。');clearTimeout(bridgeTimer);bridge=null;preview({library:data},'官方分頁同步');}catch(e){notice('同步資料無效：'+e.message);}}});
 const auth=new window.SideProjectAuth.GoogleAuth('260923931716-cevi1vcfrfoibmn3i2fdpsn1epg7hr3g.apps.googleusercontent.com',renderCloud),drive=new window.SideProjectDrive.DriveAppData(auth,'ps-game-base.json');
