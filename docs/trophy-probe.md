@@ -1,8 +1,43 @@
 # 獎盃小範圍測試
 
-Tampermonkey 整合腳本目前 v0.4.1（`dist/scripts/ps-game-base.user.js`），提供選用研究模式，以及由管理頁按鈕啟動的白金標記同步。2026-10-19 使用者提供 v0.1.5 本機助手模式的真實結果：授權及三個獎盃請求均 HTTP 200、`complete: true`，部分樣本有成功對應；未對應仍保留未知。同日使用者完成新版 Chrome 白金標記同步驗收，回覆「完成，看到新增白金筆數」。瀏覽器直接授權路徑仍未驗證成功。
+Tampermonkey 整合腳本目前 v0.4.2（`dist/scripts/ps-game-base.user.js`），提供選用研究模式，以及由管理頁按鈕啟動的白金標記同步。2026-10-19 使用者提供 v0.1.5 本機助手模式的真實結果：授權及三個獎盃請求均 HTTP 200、`complete: true`，部分樣本有成功對應；未對應仍保留未知。同日使用者完成新版 Chrome 白金標記同步驗收，回覆「完成，看到新增白金筆數」。瀏覽器直接授權路徑仍未驗證成功。
 
-## v0.4.1：正式白金同步改用瀏覽器直接授權（待實機）
+## v0.4.2：限定 Tampermonkey 的傳輸對照
+
+使用者選擇「希望只保留 Tampermonkey 腳本」，不安裝專用 Chrome 擴充套件，不以常駐／自動啟動助手取代需求。正式直接授權仍未修通；本版只加入手動診斷以定位傳輸差異，不盲目改 Cookie／端點／白金邏輯。
+
+官方白金面板與一般研究面板均提供「檢查瀏覽器連線（不改資料）」，不需候選遊戲；只在手動點擊後執行，最多 4 個請求：
+
+1. ssocookie，GM 一般模式。
+2. ssocookie，GM fetch:true。
+3. ssocookie，GM redirect:manual。
+4. 同一 Sony authorize 端點，GM redirect:manual、anonymous:true，不注入 Cookie、Authorization 或 NPSSO。
+
+每組僅一次；預期比較 network 失敗，因此非限流的 network 可繼續下一個不同對照組。401／403／429、取消則停止後續組。無 token exchange、獎盃 API、本機助手、PM 白金結果或存檔寫入。既有暫存 token 在檢查前後清空。
+
+輸出沿用 probe schema，authMethod:browser-transport-check、checks 陣列；匯出為 `ps-game-base-auth-checks-日期_時分.json`。只記錄狀態、transport、時間、hasSession、redirectTarget／hasAccessCode 等分類／布林，無完整 Location 或登入本文。complete 只表示四組已完成，不表示授權成功。
+
+163 項 Node 測試通過，包含 Fetch 全失敗／只有 OAuth 失敗、固定 Sony 目的地與最多 4 次、無敏感資料、無助手／獎盃／回傳標記、限流／授權錯誤停止及取消。實際 Chrome 結果仍待使用者提供，不能將合成結果作根因結論。
+
+## v0.4.1：Chrome 實測仍失敗（2026-10-19）
+
+收到使用者 v0.4.1、Tampermonkey 5.5.1 的實際授權診斷（05:35:21Z）：
+
+| 階段 | 結果 |
+| --- | --- |
+| sony-session | HTTP 200，326ms；後續程式已驗證 NPSSO 格式並進入授權碼請求 |
+| sony-access-code | network／408，576ms，failed-to-fetch；explicitSessionCookie: true，沒有 Location 或可驗證 code |
+| sony-access-token | 未執行 |
+| 獎盃 API | 0 次，未取得白金結果，未更動標記 |
+| 官方庫捕捉 | 14 個 GraphQL 已解碼，4 個已購買回應，96 筆原始列，解析錯誤 0 |
+
+這確認 v0.4.1 仍未排除原來的授權碼失敗；explicitSessionCookie 只證明腳本設定了 GM 選項，不證明 Cookie 實際送達 Sony 或 Sony 已接受。408 出現在管理器的 network callback，不能直接認定是 Sony HTTP 逾時，也不能由沒有 Location 推定 Sony 沒有發出重新導向。
+
+本次不再試改 Cookie 名稱、批次速度或白金判斷；失敗發生在獎盃查詢之前。現階段不能宣稱 Tampermonkey 直接模式可取代已成功的 Node 助手，也不能把根因直接定為瀏覽器缺陷。若採專用 Chrome 擴充套件，可研究其 webRequest 的回應標頭／重新導向事件，但須另行實測，尚無成品或成功承諾；使用者已選擇只保留 Tampermonkey，故不採擴充套件方案。
+
+私人原始 JSON 不加入 repo；下方為原候選修正的實作與合成測試記錄。
+
+## v0.4.1：直接授權候選修正（原實作記錄）
 
 使用者要求免開 PowerShell。正式同步改呼叫 `authorize(run,'browser')`，使用 GM `cookie` 選項把已讀得的 NPSSO 明確帶給固定的 Sony `/api/authz/v3/oauth/authorize`，搭配 manual redirect；只接受既有 app URI 的唯一安全 code。交換 token 也使用 manual redirect，失敗不繼續獎盃 API、不改連本機助手。診斷僅增加 `explicitSessionCookie` 布林，不保存 Cookie 本文。
 

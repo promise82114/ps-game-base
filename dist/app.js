@@ -1,7 +1,7 @@
-import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js?v=20261019-1';
-import {icon} from './icons.js?v=20261019-1';
-import {compareImport,resolveImport} from './sync.js?v=20261019-1';
-import {platinumTitleIds,applyPlatinum} from './platinum.js?v=20261019-1';
+import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js?v=20261019-2';
+import {icon} from './icons.js?v=20261019-2';
+import {compareImport,resolveImport} from './sync.js?v=20261019-2';
+import {platinumTitleIds,applyPlatinum} from './platinum.js?v=20261019-2';
 const $ = id => document.getElementById(id), KEY = 'ps-game-base.v1';
 let state = {library:{schemaVersion:1,complete:false,syncedAt:null,games:[],missingIds:[]},personal:emptyPersonal()}, view='all', category='', selected=new Set(), shown=[], pendingImport=null, demo=false;
 let bridge=null, bridgeTimer, cloudRead=false, cloudBusy=false, prepared=false;

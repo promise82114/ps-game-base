@@ -2,6 +2,22 @@
 
 更新日期：2026-10-19（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
 
+## 2026-10-19 v0.4.2 傳輸對照：只保留 Tampermonkey
+
+- 使用者已回覆「希望只保留 Tampermonkey 腳本」。不新增擴充套件、公開授權代理、常駐助手；正式直接授權仍未成功，不宣稱這版已修通。
+- 整合腳本升 v0.4.2，新增「檢查瀏覽器連線（不改資料）」：手動最多 4 個 Sony 控制請求（一般／Fetch／manual 的 ssocookie，以及 anonymous manual authorize），不交換 token、不查獎盃、不連 loopback、不回傳標記或寫存檔。各組一次，network 可繼續下一個不同對照；401／403／429、取消停止後續派送。
+- 輸出為 ps-game-base-auth-checks-日期_時分.json，沿用 probe kind，authMethod 為 browser-transport-check，checks 含 transport／狀態／時間／安全布林與重新導向分類。原始登入回應只即時判斷格式，不持久化、不顯示憑證。complete 代表檢查跑完，不代表授權成功。
+- 163 項完整 Node 測試通過，涵蓋傳輸組別差異、隱私、固定目的地／最大次數、無自動啟動／助手／獎盃寫入、限流與停止；語法／差異檢查通過；獨立 4177 的真實瀏覽器以合成回應確認新增按鈕、鍵盤啟動、四組結果、完成後可匯出、本機助手計數 0。臨時驗證頁已刪除；不是 Sony 實測。下一步由 Chrome 更新 v0.4.2、重開官方白金分頁、手動跑此診斷再提供結果。
+- 基準 HEAD d67d3cd（main）。此輪變更限本次診斷 userscript／tests、index 提示與文件；資源版號另透過既有工具統一換為 20261019-2，避免安裝入口快取。未 commit／push；私人報告未加入 repo。
+
+## 2026-10-19 直接授權實測失敗與下一步
+
+- 使用者提供 v0.4.1 真實診斷，Tampermonkey 5.5.1：sony-session HTTP 200／326ms；sony-access-code network／408／576ms、failed-to-fetch，explicitSessionCookie: true，無 Location／code；沒有 token 交換，獎盃請求為 0。官方庫捕捉 14 次解碼、4 次已購買回應、96 筆原始列，解析錯誤 0。原始私人 JSON 未加入 Git。
+- 這證明直接模式尚未成功，不能把舊助手成功算作 v0.4.1 驗收。GM cookie 選項有設定，不等於已證明 Cookie 送達／Sony 接受；network callback 的 408 不等於已確認 Sony HTTP 逾時。沒有足夠證據歸因 Chrome、Tampermonkey、憑證或 Sony。
+- 本次只記錄實測，未再改正式授權、分類或速度；未修改瀏覽器設定，也不要求反覆重登。已詢問使用者是否接受專用 Chrome 擴充套件以研究回應標頭／重新導向事件，或必須只保留 Tampermonkey；使用者隨後選擇只保留 Tampermonkey，尚未開發／安裝擴充套件，不能宣稱該替代路徑已成功。
+- 本次基準 HEAD `d67d3cd`（main），快取版號修正已是目前 HEAD；開始讀取時存在其他工作中的快取修改，隨後由外部操作提交，本輪沒有還原／覆寫它們。此輪只有 AGENTS 與兩份研究／交接文件修改，未 commit／push。
+- 文件驗證核對實際報告數值、來源連結及 git diff --check；本輪沒有程式變更，因此未重跑完整合成測試。先前的 157／159 項通過仍不代表 Sony 授權成功。
+
 ## 2026-10-19 JS／CSS 快取版本
 
 - 基準 HEAD `36332c5`（main）；使用者已自行推送前次提交。新 HTML 混用舊 app.js 的情境已重現：舊版綁定已移除的 mobile-settings 時中斷，後續資料操作按鈕無事件；使用者確認強制重新整理後恢復。

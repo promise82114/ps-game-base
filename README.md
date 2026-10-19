@@ -23,7 +23,7 @@ npm start
 - 發布前自動用本次 commit SHA 更新本機 JS／CSS 網址的 `?v=`，涵蓋入口、共用腳本及 ES module 相依檔案，避免新版 HTML 混用舊快取。直接發布 `dist/` 前可先執行 `node tools/version-assets.mjs <版本號>`；同次發布共用一個新版本號，不需更改 Tampermonkey 的腳本版本。
 - GitHub repo 的 Settings → Pages → Build and deployment → Source 須選擇 **GitHub Actions**。
 - 此 repo 的預設 Pages 網址為 `https://promise82114.github.io/ps-game-base/`；實際發布網址以 Actions 的部署結果為準。
-- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的整合腳本至 0.4.1。
+- 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的整合腳本至 0.4.2。
 - Google OAuth Client 的「已授權 JavaScript 來源」須加入 `https://promise82114.github.io`（僅 origin，不含 `/ps-game-base/`）。此設定需由 Google Cloud 管理者操作。
 - 本機與 Pages 的瀏覽器存檔分開；可透過完整 JSON 備份搬移。
 - 與 EDF 相同，首頁設定 `<meta name="robots" content="noindex, nofollow">`，要求支援此規則的搜尋引擎不要收錄。這不是存取控制，知道公開網址的人仍可開啟網站；個人匯入資料不隨靜態網站發布。參考 [Google noindex 說明](https://developers.google.com/search/docs/crawling-indexing/block-indexing)。
@@ -42,7 +42,7 @@ npm start
 
 ## 分頁撈取更新
 
-開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.4.1，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
+開發副本位於 `dist/scripts/ps-game-base.user.js`，版本 0.4.2，從 `D:\gitp\tampermonkey-scripts\ps-game-base\ps-game-base.user.js` 複製後獨立開發，原檔未修改。
 
 1. 先在 Chrome / Edge 安裝 Tampermonkey。
 2. 在頁面的「資料與同步」點「安裝 / 更新 Tampermonkey 腳本」，或將副本內容貼入 Tampermonkey 新腳本。
@@ -58,7 +58,7 @@ npm start
 
 0.2.2 完整補回原版 0.1.3 的 `parsePayload` 與解析階段診斷。保留 `/recently-purchased`、JSON／批次 GraphQL、URL-encoded POST、Request 複本、無 Bearer 工作階段與管理頁回傳流程。修正 0.2.1 漏掉的「網址參數與表單本文合併」：例如操作名稱在網址、extensions 在表單時，現在可取得查詢碼；表單欄位優先於同名網址欄位。這個缺口已用合成請求重現並修正，但不能斷定使用者截圖的所有格式錯誤都由此造成。
 
-更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.4.1；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
+更新 Tampermonkey 後，關閉舊官方分頁，從管理頁重新按「更新遊戲庫」，確認面板為 v0.4.2；仍在等待時，切換官方分類再回「已購買」。診斷列顯示計數、最多 6 個格式受限的操作名稱，以及最近失敗階段（請求本文、extensions JSON、請求標頭、Request 本文複本或 fetch 請求複本）。不顯示原始請求本文、網址、標頭、例外內容或權杖。「無 Bearer」是請求觀察結果，不等於授權失敗。
 
 請提供診斷列與面板提示即可，不要提供 Cookie、Bearer、NPSSO 或含授權標頭的 HAR。Sony 真實登入後的同步與分頁回傳仍須實機驗收。
 
@@ -147,14 +147,14 @@ Google GIS Token Model 在使用者點擊後取得暫存 access token；Drive sc
 
 ## 獎盃小範圍測試（整合腳本內的選用工具）
 
-遊戲庫與白金功能已合併為 `dist/scripts/ps-game-base.user.js` v0.4.1，只需安裝這支。若先前安裝過「PS Game Base 獎盃小範圍測試」，請停用或移除舊腳本，避免重複攔截與面板。安裝時保留原遊戲庫腳本的名稱及 namespace，支援原腳本更新。
+遊戲庫與白金功能已合併為 `dist/scripts/ps-game-base.user.js` v0.4.2，只需安裝這支。若先前安裝過「PS Game Base 獎盃小範圍測試」，請停用或移除舊腳本，避免重複攔截與面板。安裝時保留原遊戲庫腳本的名稱及 namespace，支援原腳本更新。
 
 一般官方分頁只顯示遊戲庫入口；由該面板點「獎盃研究工具」才展開研究模式，可返回遊戲庫。每輪手動研究仍最多 5 個 title ID，不寫分類或 Drive。獎盃 API 只有點擊研究／白金操作才查詢。詳細說明見 [獎盃測試與白金同步](docs/trophy-probe.md)。
 
 ## 同步白金標記
 
-1. 在右上角「資料與同步」第一欄安裝／更新**整合腳本 v0.4.1**，停用舊的獨立獎盃腳本，儲存後重新開啟官方分頁。
-2. 確認同一個 Chrome 已登入官方遊戲庫。v0.4.1 改由整合腳本直接向 Sony 交換暫存授權，不連線本機助手、不要求開啟 PowerShell。這次 Cookie 傳遞修正仍待 Chrome 實機驗收，不能把合成測試視為已解決先前的 network／408。
+1. 在右上角「資料與同步」第一欄安裝／更新**整合腳本 v0.4.2**，停用舊的獨立獎盃腳本，儲存後重新開啟官方分頁。
+2. 確認同一個 Chrome 已登入官方遊戲庫。v0.4.1 改由整合腳本直接向 Sony 交換暫存授權，不連線本機助手、不要求開啟 PowerShell。v0.4.1 的 Chrome 實測在授權碼步驟仍 network／408，尚未修通；v0.4.2 新增連線對照，不宣稱已成功取代助手。
 3. 回遊戲庫，在「資料與同步 → 更新與同步」按「同步白金標記」。此時才另開官方分頁、取得授權，依本次庫版本查詢，每批最多 5 個 title ID、兩批並行且無額外間隔。平常開頁面、搜尋或更新數位庫不會觸發獎盃查詢。
 4. 確認任一已知 PS4／PS5 版本的 `earnedTrophies.platinum` 是正整數，就將對應作品設為既有的 `已白金`。只判斷帳號已取得白金，不以遊戲設有白金或總進度判斷。原本追蹤／忽略會由白金取代；已白金的作品略過。
 
@@ -166,7 +166,7 @@ Google GIS Token Model 在使用者點擊後取得暫存 access token；Drive sc
 
 ## 獎盃容量與速度測試
 
-更新整合腳本至 v0.4.1，由官方遊戲庫面板展開「獎盃研究工具」，取得至少 15 個候選後，按「測試容量與分批速度（本機助手）」。最多取前 30 個，實送單次 5／10／15 個，並比較每批 5 個的 350ms／零間隔／2 或 3 批並行。最多 26 個獎盃請求，記錄 HTTP、成功率、耗時、基準一致性與 1,800 個版本的粗估；不是全庫測試。限流／授權失效即停止，不重試。
+更新整合腳本至 v0.4.2，由官方遊戲庫面板展開「獎盃研究工具」，取得至少 15 個候選後，按「測試容量與分批速度（本機助手）」。最多取前 30 個，實送單次 5／10／15 個，並比較每批 5 個的 350ms／零間隔／2 或 3 批並行。最多 26 個獎盃請求，記錄 HTTP、成功率、耗時、基準一致性與 1,800 個版本的粗估；不是全庫測試。限流／授權失效即停止，不重試。
 
 測試不修改白金、任何存檔或正式同步速度；需同電腦助手。完成可匯出 `ps-game-base-trophy-benchmark-年月日_時-分.json`。詳見 [容量與速度測試說明](docs/trophy-probe.md#v030容量與分批速度實測)。
 
@@ -209,3 +209,12 @@ v0.4.0 正式白金同步採每批 5 個、兩批並行、零間隔。約 1,800 
 正式「同步白金標記」不再呼叫 127.0.0.1:4176，也不在失敗時自動改用助手；失敗停止且不套用標記，官方白金面板可匯出不含憑證的授權診斷。每批 5 個、兩批並行、補標及備份規則保留。舊助手工具與研究模式的明確助手按鈕保留供比對；容量／速度研究按鈕目前仍使用助手，與正式白金按鈕不同。
 
 參考 [Tampermonkey GM_xmlhttpRequest 文件](https://www.tampermonkey.net/documentation.php?ext=d2&q=GM_xmlhttpRequest) 的 cookie／redirect 選項，以及 [psn-api 授權碼交換原始碼](https://github.com/achievements-app/psn-api/blob/main/src/authenticate/exchangeNpssoForAccessCode.ts)。
+
+
+### v0.4.2：只用 Tampermonkey 的連線對照（尚未修通直接授權）
+
+2026-10-19 使用者 v0.4.1 診斷證實：Sony 工作階段 HTTP 200，手動重新導向的授權碼請求仍在 576ms 回報 network／408／failed-to-fetch，無 Location／code；獎盃請求為 0。使用者明確選擇只保留 Tampermonkey，不新增專用擴充套件。
+
+更新 v0.4.2、重開官方分頁，在白金面板按「檢查瀏覽器連線（不改資料）」：最多 4 次固定 Sony 請求，對照一般／Fetch／manual 的 ssocookie，以及 anonymous 的授權重新導向。不交換 token、不查獎盃、不連本機助手、不更動標記或存檔。各組僅一次；遇 401／403／429 或手動停止，不再派送後續組。
+
+完成後按「匯出授權診斷」，檔名為 `ps-game-base-auth-checks-YYYY-MM-DD_HH-mm.json`。僅記錄 HTTP／network、transport、時間、是否讀到有效格式登入資料及重新導向分類，不匯出 Cookie、NPSSO、code、token、原始回應或完整 Location。`complete: true` 只表示四組檢查已跑完，不表示授權已成功。

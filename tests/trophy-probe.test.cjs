@@ -20,7 +20,7 @@ function setup(responses=[],browser={},hash='',fastTiming=false){
   GM_xmlhttpRequest(options){calls.push(options);const next=typeof responses==='function'?responses(options,calls.length):responses.shift();if(next?.event==='throw')throw Error('PRIVATE_EXCEPTION');let aborted=false;const handle={abort(){aborted=true;options.onabort();}};const deliver=()=>{if(aborted)return;if(!next||next.event==='error')options.onerror(next);else options.onload({status:200,responseHeaders:'',...next});};if(next?.delayMs)setTimeout(deliver,next.delayMs);else setImmediate(deliver);return handle;}};
  Object.defineProperties(context.window,Object.getOwnPropertyDescriptors(browser));
  vm.createContext(context);
- const exposed=source.replace(/\}\)\(\);\s*$/,'globalThis.probe={runBenchmark,syncPlatinum,getBusy:()=>busy,accessCode,requestUrl,report,getCapture:()=>capture,getPage:()=>page,summarize,sampleGames,libraryResponse,runProbe,stop,authorize,request,setRoot(v){root=v;},setToken(v){token=v;expires=Date.now()+60000;},setSamples(games){samples=new Map(games.map(g=>[g.titleId,g]));selected=new Set(games.map(g=>g.titleId));},getResult:()=>result,getToken:()=>token,getSamples:()=>[...samples.values()]};})();');
+ const exposed=source.replace(/\}\)\(\);\s*$/,'globalThis.probe={runAuthChecks,runBenchmark,syncPlatinum,getBusy:()=>busy,accessCode,requestUrl,report,getCapture:()=>capture,getPage:()=>page,summarize,sampleGames,libraryResponse,runProbe,stop,authorize,request,setRoot(v){root=v;},setToken(v){token=v;expires=Date.now()+60000;},setSamples(games){samples=new Map(games.map(g=>[g.titleId,g]));selected=new Set(games.map(g=>g.titleId));},getResult:()=>result,getToken:()=>token,getSamples:()=>[...samples.values()]};})();');
  vm.runInContext('const psgbTools={};\n'+exposed,context);context.probe.setRoot(root);return {api:context.probe,calls,nodes};
 }
 const sample={titleId:'PPSA12345_00',name:'Test game',platform:'PS5'};
@@ -74,7 +74,7 @@ test('HTML response is an error and cannot be interpreted as an empty trophy lis
 
 test('initial session network failure records the previously missing diagnostic without leaking callback details',async()=>{
  const {api}=setup([{event:'error',status:0,finalUrl:'https://ca.account.sony.com/api/v1/ssocookie?token=PRIVATE_TOKEN',responseText:'PRIVATE_COOKIE',error:'PRIVATE_ERROR'}]);api.setSamples([sample]);await api.runProbe();
- const result=api.getResult();assert.equal(result.probeVersion,'0.4.1');assert.equal(result.manager.version,'test-version');assert.equal(result.requests.length,0);assert.equal(result.authRequests.length,1);assert.equal(result.authRequests[0].stage,'sony-session');assert.equal(result.authRequests[0].outcome,'network');assert.equal(result.authRequests[0].status,0);assert.equal(result.authRequests[0].transport,'default');assert.match(result.error,/Sony 登入工作階段/);assert.equal(JSON.stringify(result).includes('PRIVATE_'),false);
+ const result=api.getResult();assert.equal(result.probeVersion,'0.4.2');assert.equal(result.manager.version,'test-version');assert.equal(result.requests.length,0);assert.equal(result.authRequests.length,1);assert.equal(result.authRequests[0].stage,'sony-session');assert.equal(result.authRequests[0].outcome,'network');assert.equal(result.authRequests[0].status,0);assert.equal(result.authRequests[0].transport,'default');assert.match(result.error,/Sony 登入工作階段/);assert.equal(JSON.stringify(result).includes('PRIVATE_'),false);
 });
 test('access code and access token transport failures identify the exact step',async()=>{
  const session={responseText:JSON.stringify({npsso:'a'.repeat(64)})},code={status:302,responseHeaders:'Location: com.scee.psxandroid.scecompcall://redirect/?code=PRIVATE_CODE\r\n'};
@@ -310,4 +310,50 @@ test('stop cancels in-flight benchmark workers and keeps an exportable partial r
  const transport=benchmarkTransport();let env,queries=0;
  env=setup(options=>{const response=transport(options);if(new URL(options.url).hostname==='m.np.playstation.com'&&++queries===15)setImmediate(()=>env.api.stop());return response;},{},'',true);
  env.api.setSamples(benchmarkSamples());await env.api.runBenchmark();const result=env.api.getResult();assert.equal(result.complete,false);assert.equal(result.stopReason,'cancelled');assert.ok(result.requests.length<=16);assert.equal(env.api.getToken(),'');assert.equal(env.nodes.get('export').disabled,false);
+});
+
+
+test('opt-in transport controls compare four fixed Sony requests without tokens, trophy queries or credential exports',async()=>{
+ const env=platinumSetup([
+  {responseText:JSON.stringify({npsso:'a'.repeat(64),private:'PRIVATE_BODY'})},
+  {event:'error',status:408,statusText:'Failed to fetch PRIVATE_ERROR'},
+  {event:'error',status:408,statusText:'Failed to fetch PRIVATE_ERROR'},
+  {status:302,responseHeaders:'Location: https://my.account.sony.com/central/signin/?private=PRIVATE_REDIRECT\r\n'}
+ ]);
+ env.api.setToken('PRIVATE_OLD_TOKEN');assert.equal(env.calls.length,0);await env.api.runAuthChecks();
+ const result=env.api.getResult();assert.equal(result.complete,true);assert.equal(result.authMethod,'browser-transport-check');
+ assert.equal(env.calls.length,4);assert.deepEqual(Array.from(result.checks,c=>c.status),[200,408,408,302]);
+ assert.deepEqual(Array.from(result.checks,c=>c.transport),['default','fetch','manual-redirect','manual-redirect']);
+ assert.equal(result.checks[0].hasSession,true);assert.equal(result.checks[3].redirectTarget,'sony-web');
+ assert.ok(env.calls.every(c=>new URL(c.url).origin==='https://ca.account.sony.com'&&!c.cookie&&!c.headers?.Cookie&&!c.data));
+ assert.equal(env.calls[3].anonymous,true);assert.equal(env.calls[3].redirect,'manual');assert.equal(result.requests.length,0);
+ assert.equal(env.messages.length,0);assert.equal(env.api.getToken(),'');
+ for(const value of ['a'.repeat(64),'PRIVATE_BODY','PRIVATE_ERROR','PRIVATE_REDIRECT','PRIVATE_OLD_TOKEN'])assert.equal(JSON.stringify(env.api.report()).includes(value),false);
+});
+
+test('transport controls distinguish a working fetch channel from the OAuth redirect failure',async()=>{
+ const {api,calls}=setup([
+  {responseText:JSON.stringify({npsso:'a'.repeat(64)})},
+  {responseText:JSON.stringify({npsso:'a'.repeat(64)})},
+  {responseText:JSON.stringify({npsso:'a'.repeat(64)})},
+  {event:'error',status:408,statusText:'Failed to fetch'}
+ ]);
+ await api.runAuthChecks();const result=api.getResult();assert.equal(result.complete,true);
+ assert.deepEqual(Array.from(result.checks,c=>c.status),[200,200,200,408]);
+ assert.equal(calls.length,4);assert.equal(result.checks[3].hasAccessCode,false);assert.equal(api.getToken(),'');
+});
+
+test('transport controls stop at authorization failures or rate limits instead of dispatching later scenarios',async()=>{
+ for(const status of [401,403,429]){
+  const {api,calls}=setup([{responseText:JSON.stringify({npsso:'a'.repeat(64)})},{status}]);
+  await api.runAuthChecks();assert.equal(calls.length,2);assert.equal(api.getResult().complete,false);
+  assert.equal(api.getResult().stopReason,'http-'+status);assert.equal(api.getToken(),'');
+ }
+});
+
+test('transport control cancellation aborts in-flight work and does not dispatch remaining cases',async()=>{
+ const {api,calls}=setup([{delayMs:20,responseText:JSON.stringify({npsso:'a'.repeat(64)})}]);
+ const pending=api.runAuthChecks();api.stop();await pending;
+ assert.equal(calls.length,1);assert.equal(api.getResult().complete,false);assert.equal(api.getResult().stopReason,'cancelled');
+ assert.equal(api.getResult().checks.length,0);assert.equal(api.getToken(),'');
 });

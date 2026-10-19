@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PS Game Base 遊戲庫
 // @namespace    personal.ps-game-base
-// @version      0.4.1
+// @version      0.4.2
 // @description  同步數位遊戲庫與已取得白金標記，提供 JSON 備份及選用的獎盃研究工具。
 // @match        https://library.playstation.com/*
 // @match        https://store.playstation.com/*
@@ -262,7 +262,7 @@
   function render() {
     if (!root) return;
     root.querySelector('#status').textContent = message;
-    root.querySelector('#diagnostics').textContent = `v0.4.1 · fetch ${diagnostics.fetch} / XHR ${diagnostics.xhr} / GraphQL ${diagnostics.graphql} / 已購買 ${diagnostics.purchased} / 無 Bearer ${diagnostics.noBearer} / 缺查詢碼 ${diagnostics.noHash} / 格式錯誤 ${diagnostics.parseError} · 操作：${[...operations].join(', ') || '尚未辨識'}${lastParseError ? ` · 最近解析失敗：${lastParseError}` : ''}`;
+    root.querySelector('#diagnostics').textContent = `v0.4.2 · fetch ${diagnostics.fetch} / XHR ${diagnostics.xhr} / GraphQL ${diagnostics.graphql} / 已購買 ${diagnostics.purchased} / 無 Bearer ${diagnostics.noBearer} / 缺查詢碼 ${diagnostics.noHash} / 格式錯誤 ${diagnostics.parseError} · 操作：${[...operations].join(', ') || '尚未辨識'}${lastParseError ? ` · 最近解析失敗：${lastParseError}` : ''}`;
     root.querySelector('#sync').disabled = busy || !queryHash;
     root.querySelector('#stop').disabled = !busy;
     for (const button of root.querySelectorAll('[data-export]')) button.disabled = busy || !games.length;
@@ -293,7 +293,7 @@
     const launch = el('button', 'PS Game Base', root); launch.id = 'launch';
     const panel = el('section', undefined, root); panel.id = 'panel'; panel.hidden = true; panel.setAttribute('aria-label', 'PS Game Base 遊戲庫');
     launch.onclick = () => { panel.hidden = !panel.hidden; if (!panel.hidden) psgbTools.hideTrophies?.(); render(); };
-    el('h2', 'PS Game Base · 遊戲庫 v0.4.1', panel);
+    el('h2', 'PS Game Base · 遊戲庫 v0.4.2', panel);
     if (bridge) el('p', `由 ${bridge.origin} 開啟：完整同步後，遊戲資料將自動回傳該管理頁供確認。登入憑證不會回傳。`, panel);
     el('p', '僅查詢有效的 PS4／PS5 數位授權，包含免費與 PS Plus。未包含付款紀錄、實體收藏及遊玩時數。權杖與資料僅暫存本分頁，重新整理即清除。', panel);
     const library = el('a', '開啟官方遊戲庫（登入後選「已購買」）', panel); library.href = LIBRARY; library.target = '_blank'; library.rel = 'noopener noreferrer';
@@ -471,7 +471,7 @@
    let handle,finished=false;
    const finish=(response,outcome='http')=>{
     if(finished)return;finished=true;clearTimeout(timer);handles.delete(handle);
-    const entry={stage,host:u.hostname,path,method:options.method||'GET',transport:options.redirect==='manual'?'manual-redirect':options.anonymous?'anonymous':'default',outcome,status:Number.isInteger(response?.status)?response.status:null,elapsedMs:Date.now()-start};
+    const entry={stage,host:u.hostname,path,method:options.method||'GET',transport:options.redirect==='manual'?'manual-redirect':options.fetch?'fetch':options.anonymous?'anonymous':'default',outcome,status:Number.isInteger(response?.status)?response.status:null,elapsedMs:Date.now()-start};
     if(isAuth){
      entry.explicitSessionCookie=typeof options.cookie==='string';
      const target=/^location:\s*(.+)$/im.exec(response?.responseHeaders||'')?.[1]?.trim();
@@ -590,7 +590,7 @@
   if(busy||managerBridge)return;
   const chosen=[...samples.values()].slice(0,30);if(chosen.length<15){message='效能測試至少需要 15 個不同版本。請載入遊戲庫 JSON，或在官方已購買頁取得更多候選。';render();return;}
   busy=true;token='';expires=0;requests=[];authRequests=[];const run=++generation,start=Date.now(),ids=chosen.map(g=>g.titleId),control={reason:null};
-  result={schemaVersion:1,kind:'ps-game-base-trophy-benchmark',probeVersion:'0.4.1',testedAt:new Date().toISOString(),authMethod:'local-helper',complete:false,samples:chosen,sampleCount:ids.length,projectionTargetVersions:1800,limitTests:[],profiles:[],authRequests,requests};
+  result={schemaVersion:1,kind:'ps-game-base-trophy-benchmark',probeVersion:'0.4.2',testedAt:new Date().toISOString(),authMethod:'local-helper',complete:false,samples:chosen,sampleCount:ids.length,projectionTargetVersions:1800,limitTests:[],profiles:[],authRequests,requests};
   try{
    await authorize(run,'helper');
    message=`效能測試：建立 ${ids.length} 個版本的每批 5 個基準（350ms 間隔）…`;render();
@@ -679,13 +679,45 @@
   if(event.data.type==='PSGB_PLATINUM_START')void syncPlatinum(event.data.titleIds);
   if(event.data.type==='PSGB_PLATINUM_CANCEL')stop();
  });
+ // Opt-in, bounded transport controls: no OAuth token exchange or trophy request.
+ async function runAuthChecks(){
+  if(busy)return;
+  busy=true;token='';expires=0;requests=[];authRequests=[];const run=++generation;
+  result={schemaVersion:1,kind:'ps-game-base-trophy-probe',authMethod:'browser-transport-check',testedAt:new Date().toISOString(),complete:false,samples:[],byTitle:[],catalogExample:null,recentSample:[],checks:[],authRequests,requests,
+   manager:typeof GM_info==='object'?{name:GM_info.scriptHandler,version:GM_info.version}:null};
+  const sessionUrl='https://ca.account.sony.com/api/v1/ssocookie';
+  const params=new URLSearchParams({access_type:'offline',client_id:CLIENT,redirect_uri:REDIRECT,response_type:'code',scope:'psn:mobile.v2.core psn:clientapp'});
+  const checks=[
+   {id:'session-default',label:'一般請求',url:sessionUrl,options:{}},
+   {id:'session-fetch',label:'Fetch 請求',url:sessionUrl,options:{fetch:true}},
+   {id:'session-manual',label:'手動重新導向請求',url:sessionUrl,options:{redirect:'manual'}},
+   {id:'authorize-anonymous',label:'不帶登入資料的授權對照',url:AUTH+'/authorize?'+params,options:{redirect:'manual',anonymous:true}}
+  ];
+  try{
+   for(const check of checks){
+    if(run!==generation)throw Error('cancelled');
+    message=`瀏覽器連線檢查 ${result.checks.length+1} / 4：${check.label}…`;render();
+    let response;try{response=await request(check.url,check.options);}catch{}
+    if(run!==generation)throw Error('cancelled');
+    const diagnostic=authRequests.at(-1);
+    let hasSession=null;
+    if(check.url===sessionUrl&&response?.status===200){try{hasSession=/^[A-Za-z0-9_-]{64}$/.test(JSON.parse(response.responseText).npsso||'');}catch{}}
+    result.checks.push({id:check.id,label:check.label,outcome:diagnostic.outcome,status:diagnostic.status,transport:diagnostic.transport,elapsedMs:diagnostic.elapsedMs,hasSession,redirectTarget:diagnostic.redirectTarget,hasAccessCode:diagnostic.hasAccessCode});
+    // Permission failures and throttling are not transport controls to work around.
+    if([401,403,429].includes(diagnostic.status)){result.stopReason='http-'+diagnostic.status;break;}
+   }
+   result.complete=result.checks.length===checks.length;
+   message=(result.complete?'瀏覽器連線檢查完成。':'瀏覽器連線檢查已停止。')+'只記錄狀態與計數，沒有查詢獎盃、交換權杖或修改標記；請匯出授權診斷。';
+  }catch{result.stopReason=run!==generation?'cancelled':'diagnostic';message='瀏覽器連線檢查已停止，未變更標記；可匯出部分診斷。';}
+  finally{token='';expires=0;busy=false;render();}
+ }
  async function runProbe(mode='browser'){
   if(busy||managerBridge)return;
   const chosen=[...selected].map(id=>samples.get(id)).filter(Boolean);
   if(!chosen.length||chosen.length>5){message='請選 1–5 個不同的 titleId。';render();return;}
   busy=true;requests=[];authRequests=[];const run=++generation;
   const manager=typeof GM_info==='object'&&GM_info?{name:typeof GM_info.scriptHandler==='string'?GM_info.scriptHandler:null,version:typeof GM_info.version==='string'?GM_info.version:null}:null;
-  result={schemaVersion:1,kind:'ps-game-base-trophy-probe',probeVersion:'0.4.1',authMethod:mode==='helper'?'local-helper':'browser',manager,testedAt:new Date().toISOString(),complete:false,samples:chosen,byTitle:[],catalogExample:null,recentSample:[],authRequests,requests};
+  result={schemaVersion:1,kind:'ps-game-base-trophy-probe',probeVersion:'0.4.2',authMethod:mode==='helper'?'local-helper':'browser',manager,testedAt:new Date().toISOString(),complete:false,samples:chosen,byTitle:[],catalogExample:null,recentSample:[],authRequests,requests};
   const catalog=root.getElementById('catalog').checked;
   try{
    await authorize(run,mode);
@@ -717,12 +749,12 @@
  }
  function stop(){generation++;if(platinumRunning)sendPlatinum('PSGB_PLATINUM_ERROR',{code:'cancelled'});for(const h of handles)h?.abort();handles.clear();token='';expires=0;message='已停止並清除記憶體授權。重新整理可清除本分頁測試結果。';render();}
  function element(tag,text,parent){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(parent)parent.append(n);return n;}
- function report(){return {...(result||{schemaVersion:1,kind:'ps-game-base-trophy-probe',testedAt:new Date().toISOString(),complete:false,authMethod:managerBridge?'browser-cookie':'not-started',manager:typeof GM_info==='object'?{name:GM_info.scriptHandler,version:GM_info.version}:null,samples:[...selected].map(id=>samples.get(id)).filter(Boolean),byTitle:[],catalogExample:null,recentSample:[],authRequests,requests}),probeVersion:'0.4.1',capture:{...capture},captureFailures:captureFailures.map(item=>({...item}))};}
+ function report(){return {...(result||{schemaVersion:1,kind:'ps-game-base-trophy-probe',testedAt:new Date().toISOString(),complete:false,authMethod:managerBridge?'browser-cookie':'not-started',manager:typeof GM_info==='object'?{name:GM_info.scriptHandler,version:GM_info.version}:null,samples:[...selected].map(id=>samples.get(id)).filter(Boolean),byTitle:[],catalogExample:null,recentSample:[],authRequests,requests}),probeVersion:'0.4.2',capture:{...capture},captureFailures:captureFailures.map(item=>({...item}))};}
  function exportTimestamp(date=new Date()){
   const pad=value=>String(value).padStart(2,'0');
   return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}`;
  }
- function download(){const url=URL.createObjectURL(new Blob([JSON.stringify(report(),null,2)],{type:'application/json'}));const a=element('a');a.href=url;a.download=(result?.kind==='ps-game-base-trophy-benchmark'?'ps-game-base-trophy-benchmark-':'ps-game-base-trophy-probe-')+exportTimestamp()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+ function download(){const url=URL.createObjectURL(new Blob([JSON.stringify(report(),null,2)],{type:'application/json'}));const a=element('a');a.href=url;a.download=(result?.authMethod==='browser-transport-check'?'ps-game-base-auth-checks-':result?.kind==='ps-game-base-trophy-benchmark'?'ps-game-base-trophy-benchmark-':'ps-game-base-trophy-probe-')+exportTimestamp()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
  function renderBenchmark(value,output){
   element('strong','單次請求容量',output);
   for(const row of value.limitTests)element('p',`${row.requestedCount} 個：HTTP ${row.status??'未完成'} · ${row.elapsedMs??0}ms · ${{baseline:'5 個基準','rejected-or-failed':'拒絕或失敗','response-differs':'與 5 個基準不一致','insufficient-tail-evidence':'結果相符，但缺少第 6／11 個以後的有效對應，尚無法證明完整處理','matches-baseline':'與基準一致，包含超過 5 個的有效對應'}[row.verdict]}`,output);
@@ -739,10 +771,12 @@
    label.append(check,document.createTextNode(`${g.name} · ${g.platform||''} · ${g.titleId}`));
   }
   root.getElementById('run').disabled=busy||!selected.size;root.getElementById('load').disabled=busy;root.getElementById('export').disabled=busy;root.getElementById('catalog').disabled=busy;
+  root.getElementById('auth-checks').disabled=busy;
   root.getElementById('helper-run').disabled=busy||!selected.size;
   root.getElementById('benchmark-run').disabled=busy||samples.size<15;
   const output=root.getElementById('output');output.replaceChildren();
   if(result){
+   if(result.authMethod==='browser-transport-check')for(const check of result.checks)element('p',`${check.label}：${check.outcome} / ${check.status??'未知'} · ${check.elapsedMs}ms${check.hasSession===null?'':check.hasSession?' · 有登入資料':' · 未取得登入資料'}`,output);
    if(result.kind==='ps-game-base-trophy-benchmark')renderBenchmark(result,output);
    for(const g of result.byTitle||[]){const row=element('div',undefined,output);element('strong',`${g.name} · ${g.titleId}`,row);if(!g.trophySets.length)element('p',g.explanation,row);for(const t of g.trophySets)element('p',`${t.name||''} · ${t.platform||''}\n獎盃總數 ${t.totalTrophies??'未知'}；有白金：${t.hasPlatinum===null?'未知':t.hasPlatinum?'有':'沒有'}\n已取得 ${t.earnedCount??'未知'}；個人進度 ${t.progress??'未知'}%；已白金：${t.platinumEarned===null?'未知':t.platinumEarned?'是':'否'}\n${t.npCommunicationId||'無獎盃組 ID'}`,row);}
    const detail=element('details',undefined,output);element('summary','查看完整測試結果與額外範例',detail);element('pre',JSON.stringify(result,null,2),detail);
@@ -752,7 +786,7 @@
  function mount(){
   host=element('div');host.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483646;width:min(650px,95vw);';document.body.append(host);root=host.attachShadow({mode:'closed'});
   const style=element('style',undefined,root);style.textContent=':host{font:13px/1.7 system-ui;color:#e8eef8}section{background:#142037;border:1px solid #6881a4;border-radius:12px;padding:18px;max-height:80vh;overflow:auto;box-shadow:0 10px 50px #0009}h2{margin:0;font-size:19px}p{white-space:pre-wrap}button{background:#293f5f;color:#e8eef8;border:1px solid #6881a4;border-radius:6px;padding:7px 10px;margin:4px;cursor:pointer}button:disabled{opacity:.5}label{display:block;margin:7px 0;overflow-wrap:anywhere}input{margin-right:8px}#games{max-height:190px;overflow:auto;border-block:1px solid #435675;margin-block:12px}#message{background:#223752;padding:10px;position:sticky;top:0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}#output>div{border-top:1px solid #435675;padding-top:10px}small{color:#b8c8dd}a{color:#b8d6ff}[hidden]{display:none!important}';
-  const box=element('section',undefined,root);researchBox=box;element('h2',managerBridge?'PS Game Base · 白金標記同步 v0.4.1':'PS Game Base · 獎盃小範圍測試 v0.4.1',box);
+  const box=element('section',undefined,root);researchBox=box;element('h2',managerBridge?'PS Game Base · 白金標記同步 v0.4.2':'PS Game Base · 獎盃小範圍測試 v0.4.2',box);
   element('p',managerBridge?'由遊戲庫手動啟動，只回傳帳號已取得白金的版本，不清除任何標記。':'每輪最多 5 個版本。重點：獎盃總數、有沒有白金，以及個人是否取得。未對應不代表沒有白金。',box);
   element('small',managerBridge?'整合腳本直接向 Sony 取得本次暫存授權；不連線本機助手。憑證不回傳管理頁、不寫入備份或雲端。':'憑證不寫入 DOM、匯出 JSON、localStorage 或 Drive。本機助手模式會把暫存 Sony 登入資料傳到你電腦的 127.0.0.1:4176，再由助手只向 Sony 交換授權；白金同步由管理頁點擊啟動，獨立測試須按下方測試按鈕。',box);
   const messageNode=element('p',message,box);messageNode.id='message';messageNode.setAttribute('role','status');
@@ -765,6 +799,7 @@
   const run=element('button','瀏覽器直接測試',box);run.id='run';run.onclick=()=>runProbe('browser');const clear=element('button','停止／清除授權',box);clear.onclick=stop;
   const benchmarkNote=element('p','效能測試使用前 30 個候選（至少 15 個，不受上方勾選影響）：比較單次 5／10／15 個，以及零間隔、2／3 批並行。最多 26 個獎盃請求，另有授權步驟；不改分類或存檔。',box);
   const benchmarkRun=element('button','測試容量與分批速度（本機助手）',box);benchmarkRun.id='benchmark-run';benchmarkRun.onclick=runBenchmark;
+  const authCheck=element('button','檢查瀏覽器連線（不改資料）',box);authCheck.id='auth-checks';authCheck.onclick=runAuthChecks;
   const exp=element('button','匯出結果／診斷 JSON',box);exp.id='export';exp.onclick=download;const close=element('button',managerBridge?'收合':'返回遊戲庫',box);close.onclick=()=>{if(managerBridge){box.hidden=true;opener.hidden=false;}else{host.hidden=true;returnToLibrary?.();}};
   const output=element('div',undefined,box);output.id='output';const opener=element('button',managerBridge?'白金同步':'獎盃測試',root);opener.hidden=true;opener.onclick=()=>{box.hidden=false;opener.hidden=true;};render();
   if(managerBridge){for(const n of [load,list,label,helperRun,run,diagnostics,benchmarkNote,benchmarkRun])n.hidden=true;exp.textContent='匯出授權診斷';message='等待遊戲庫指定本次白金查詢範圍…';render();sendPlatinum('PSGB_PLATINUM_READY');}
