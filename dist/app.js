@@ -1,12 +1,14 @@
-import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js?v=20261019-5';
-import {icon} from './icons.js?v=20261019-5';
-import {compareImport,resolveImport} from './sync.js?v=20261019-5';
-import {platinumTitleIds,applyPlatinum} from './platinum.js?v=20261019-5';
+import {classificationOptions, classificationFor, matchesClassification, library, personal, emptyPersonal, blankRecord, workRecordFor, hasWorkConflicts, groupGames, matchesWorkFilters, mergeLibrary, parseImport} from './model.js?v=20261019-8';
+import {icon} from './icons.js?v=20261019-8';
+import {compareImport,resolveImport} from './sync.js?v=20261019-8';
+import {platinumTitleIds,applyPlatinum} from './platinum.js?v=20261019-8';
 const $ = id => document.getElementById(id), KEY = 'ps-game-base.v1';
 let state = {library:{schemaVersion:1,complete:false,syncedAt:null,games:[],missingIds:[]},personal:emptyPersonal()}, view='all', category='', selected=new Set(), shown=[], pendingImport=null, demo=false;
 let bridge=null, bridgeTimer, cloudRead=false, cloudBusy=false, prepared=false;
 let platinumBridge=null, platinumTimer;
 let works = new Map();
+const filters={platform:[],membership:[],status:[]};
+const classificationViews={platinum:'已白金',tracked:'想玩',ignored:'不再遊玩',abandoned:'已棄坑'};
 function notice(message) {
  for(const id of ['data-notice','import-notice']){$(id).textContent=message;$(id).hidden=false;}
  const toast=$('notice');toast.textContent=message;toast.classList.add('visible');
@@ -18,10 +20,17 @@ let storageFailed=false, externalChanged=false;
 function persist(){if(demo)return true;if(externalChanged){storageFailed=true;notice('另一分頁已有新版本，已停止寫入。請匯出此頁備份，再重新整理，避免覆蓋新資料。');return false;}try{localStorage.setItem(KEY,JSON.stringify(state));storageFailed=false;return true;}catch{storageFailed=true;notice('瀏覽器儲存失敗！目前變更只在此分頁，請立即匯出備份。');return false;}}
 function el(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;}
 function option(select,value,label){const n=el('option',label??value);n.value=value;select.append(n);}
-for(const id of ['status','batch-status']) for(const item of classificationOptions) option($(id),item.value,item.label);
-option($('status'),'unclassified','未分類');option($('status'),'exclude-ignored','排除忽略');option($('batch-status'),'未開始','清除分類');
+for(const item of classificationOptions) option($('batch-status'),item.value,item.label);
+option($('batch-status'),'未開始','清除分類');
+const filterOptions={platform:[{value:'PS5',label:'PS5'},{value:'PS4',label:'PS4'}],membership:[{value:'PS_PLUS',label:'PS Plus',icon:'ps-plus'},{value:'NONE',label:'非 PS Plus'},{value:'UNKNOWN',label:'來源不明'}],status:[...classificationOptions,{value:'unclassified',label:'未分類'}]};
+for(const [id,items] of Object.entries(filterOptions)) for(const item of items){
+ const button=el('button',undefined,'filter-chip');button.type='button';button.dataset.value=item.value;button.setAttribute('aria-pressed','false');
+ if(item.tone)button.dataset.tone=item.tone;if(item.icon)button.append(icon(item.icon));button.append(el('span',item.label),el('span','✓','filter-check'));
+ button.onclick=()=>{const values=filters[id];filters[id]=values.includes(item.value)?values.filter(value=>value!==item.value):[...values,item.value];if(id==='status'&&classificationViews[view])view='all';render();};$(id).append(button);
+}
 for(const item of classificationOptions){const label=el('label',undefined,'status-choice'),input=el('input'),visual=el('span',undefined,'status-option');input.type='radio';input.name='classification';input.value=item.value;visual.dataset.tone=item.tone;visual.append(icon(item.icon),el('span',item.label));label.append(input,visual);$('edit-classifications').append(label);input.onchange=()=>{if(input.checked)setEditorStatus(input.value);};}
 for(const b of $('views').querySelectorAll('[data-classification]')){const item=classificationFor(b.dataset.classification);b.dataset.tone=item.tone;b.prepend(icon(item.icon));}
+for(const stat of document.querySelectorAll('.stats [data-tone]')){const item=classificationOptions.find(item=>item.tone===stat.dataset.tone);stat.querySelector('span').prepend(icon(item.icon));}
 function setEditorStatus(value){$('edit-status').value=value;for(const input of $('edit-classifications').querySelectorAll('input'))input.checked=input.value===value;$('legacy-status').hidden=value==='未開始'||!!classificationFor(value);$('legacy-status').textContent=`保留舊狀態「${value}」。選擇上方分類或清除分類後，才會變更原狀態。`;}
 $('clear-status').onclick=()=>setEditorStatus('未開始');
 function record(id){return workRecordFor(state.personal,works.get(id));}
@@ -34,18 +43,20 @@ function exportTimestamp(date=new Date()){
 function download(value,name){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=el('a');a.href=url;a.download=`ps-game-base-${name}-${exportTimestamp()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function render(){
  const games=groupGames(state.library.games,state.library.missingIds);works=new Map(games.map(g=>[g.key,g]));const records=games.map(g=>record(g.key));
- $('stat-total').textContent=games.length;$('nav-count').textContent=games.length;
+ $('stat-total').textContent=games.length;$('heading-total').textContent=games.length;$('nav-count').textContent=games.length;
  $('stat-entitlements').textContent=`${state.library.games.length} 筆 PS4 / PS5 數位授權`;
- $('stat-platinum').textContent=records.filter(r=>r.status==='已白金').length;$('stat-ignored').textContent=records.filter(r=>r.status==='不再遊玩').length;$('stat-tracked').textContent=records.filter(r=>r.status==='想玩').length;
+ $('stat-unclassified').textContent=records.filter(r=>!classificationFor(r.status)).length;
+ for(const item of classificationOptions)$('stat-'+item.tone).textContent=records.filter(r=>r.status===item.value).length;
  $('summary').textContent=demo?'示範模式 · 所有操作不會寫入你的遊戲庫':state.library.syncedAt?`最近同步 ${new Date(state.library.syncedAt).toLocaleString('zh-TW')} · ${state.library.complete?'完整結果':'部分結果，尚未判定缺少授權'}${storageFailed?' · 儲存失敗，請匯出備份':''}`:'把擁有的遊戲，整理成想玩的生活。';
- const names={all:'所有遊戲',platinum:'白金',ignored:'忽略',tracked:'追蹤',missing:'未出現在最近同步'};
- $('heading').replaceChildren(el('span',category||names[view]),el('small',' / LIBRARY'));
+ const names={all:'所有遊戲',platinum:'白金',ignored:'忽略',tracked:'追蹤',abandoned:'棄坑',missing:'未出現在最近同步'};
+ $('heading').textContent=category||names[view];
+ for(const id of Object.keys(filters)) for(const button of $(id).querySelectorAll('button'))button.setAttribute('aria-pressed',String(filters[id].includes(button.dataset.value)));
  for(const b of $('views').querySelectorAll('button')){const active=!category&&b.dataset.view===view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}
  $('categories').replaceChildren();$('batch-category').replaceChildren();option($('batch-category'),'','選擇分類');$('category-filter').replaceChildren();option($('category-filter'),'','全部分類');
- for(const c of state.personal.categories){const b=el('button',`◌　${c}`);b.classList.toggle('active',category===c);b.onclick=()=>{category=c;render();};$('categories').append(b);option($('batch-category'),c);option($('category-filter'),c);}$('category-filter').value=category;
+ for(const c of state.personal.categories){const b=el('button',`◌　${c}`);b.classList.toggle('active',category===c);b.onclick=()=>selectCategory(c);$('categories').append(b);option($('batch-category'),c);option($('category-filter'),c);}$('category-filter').value=category;
  const search=$('search').value.trim().toLocaleLowerCase();
- const filtered=games.filter(g=>{const r=record(g.key);return (!category||r.categories.includes(category))&&(category||view!=='missing'||g.missingCount>0)&&matchesClassification(r.status,{view,filter:$('status').value,customCategory:!!category})&&(!search||[...g.members.map(m=>m.name),r.note,...r.tags].join(' ').toLocaleLowerCase().includes(search))&&matchesWorkFilters(g,{platform:$('platform').value,membership:$('membership').value,missingOnly:!category&&view==='missing'},state.library.missingIds);});
- filtered.sort((a,b)=>{const x=record(a.key),y=record(b.key);return ($('sort').value==='updated'?y.updatedAt.localeCompare(x.updatedAt):0)||a.name.localeCompare(b.name,'zh-Hant');});
+ const filtered=games.filter(g=>{const r=record(g.key);return (!category||r.categories.includes(category))&&(category||view!=='missing'||g.missingCount>0)&&matchesClassification(r.status,{view,filter:filters.status,customCategory:!!category})&&(!search||[...g.members.map(m=>m.name),r.note,...r.tags].join(' ').toLocaleLowerCase().includes(search))&&matchesWorkFilters(g,{platform:filters.platform,membership:filters.membership,missingOnly:!category&&view==='missing'},state.library.missingIds);});
+ filtered.sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant'));
  shown=filtered;
  $('grid').replaceChildren();$('empty').hidden=filtered.length>0;
  $('empty').querySelector('h2').textContent=games.length?'沒有符合條件的遊戲':'為你的遊戲，留一個位置。';
@@ -71,8 +82,8 @@ function render(){
 function renderBatch(){$('batch').hidden=!selected.size;$('selected-count').textContent=`已選 ${selected.size} 部作品`;}
 function quickClassifications(game,status){
  const controls=el('div',undefined,'quick-classifications');controls.setAttribute('role','radiogroup');controls.setAttribute('aria-label',game.name+'分類');let keyboard=false;
- for(const value of ['已白金','想玩','不再遊玩']){
-  const item=classificationFor(value),label=el('label',undefined,'quick-choice'),input=el('input'),visual=el('span',undefined,'quick-option');
+ for(const item of classificationOptions){const value=item.value;
+  const label=el('label',undefined,'quick-choice'),input=el('input'),visual=el('span',undefined,'quick-option');
   label.dataset.tone=item.tone;label.title=item.label;input.type='radio';input.name='quick-'+game.key;input.value=value;input.checked=status===value;input.dataset.workKey=game.key;input.setAttribute('aria-label',game.name+'：'+item.label);visual.append(icon(item.icon));label.append(input,visual);controls.append(label);
   label.onpointerdown=()=>{keyboard=false;};input.onkeydown=()=>{keyboard=true;};
   const saveStatus=next=>{update(game.key,{status:next});persist();render();if(keyboard){const replacement=[...$('grid').querySelectorAll('.quick-choice input')].find(n=>n.dataset.workKey===game.key&&n.value===value);replacement?.focus();}};
@@ -81,9 +92,11 @@ function quickClassifications(game,status){
  }
  return controls;
 }
-for(const b of $('views').querySelectorAll('button'))b.onclick=()=>{view=b.dataset.view;category='';$('status').value='';render();};
-$('category-filter').onchange=()=>{category=$('category-filter').value;render();};
-for(const id of ['search','platform','status','membership','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{render();});
+for(const b of $('views').querySelectorAll('button'))b.onclick=()=>{view=b.dataset.view;category='';filters.status=classificationViews[view]?[classificationViews[view]]:[];render();};
+function selectCategory(value){category=value;if(classificationViews[view]){view='all';filters.status=[];}render();}
+$('category-filter').onchange=()=>selectCategory($('category-filter').value);
+$('search').addEventListener('input',()=>render());
+$('clear-filters').onclick=()=>{for(const id of Object.keys(filters))filters[id]=[];$('search').value='';category='';view='all';render();};
 $('select-all').onclick=()=>{shown.forEach(g=>selected.add(g.key));render();};$('clear-selection').onclick=()=>{selected.clear();render();};
 function batch(fn){for(const id of selected)fn(id);const saved=persist();render();if(saved)notice('已更新選取的遊戲。');}
 $('apply-status').onclick=()=>batch(id=>update(id,{status:$('batch-status').value}));$('apply-category').onclick=()=>{const c=$('batch-category').value;if(c)batch(id=>update(id,{categories:[...new Set([...record(id).categories,c])]}));};
@@ -214,7 +227,7 @@ $('cloud-disconnect').onclick=()=>{auth.disconnect();cloudRead=false;renderCloud
 $('cloud-read').onclick=()=>cloudAction(async()=>{const result=await drive.read();if(!result){cloudRead=true;return notice('雲端尚無備份，可以上傳本機資料。');}const data=parseImport(result.value);if(!data.personal||!data.library)throw Error('雲端檔案不是完整遊戲庫備份。');cloudRead=true;preview(data,'Google Drive',{expected:result});});
 $('cloud-write').onclick=()=>cloudAction(async()=>{const result=await drive.read();let data={};if(result){data=parseImport(result.value);if(!data.personal||!data.library)throw Error('雲端檔案不是完整遊戲庫備份。');}cloudRead=true;preview(data,result?'Google Drive':'Google Drive（尚無備份）',{action:'upload',expected:result});});
 let realState;
-$('demo').onclick=()=>{realState=structuredClone(state);demo=true;state={library:{schemaVersion:1,complete:true,syncedAt:null,missingIds:[],games:['ASTRO BOT','Ghost of Yōtei','DEATH STRANDING 2','FINAL FANTASY VII REBIRTH','ELDEN RING','Horizon Forbidden West','God of War Ragnarök','It Takes Two'].map((name,i)=>({name,entitlementId:'demo-'+i,conceptId:'demo-concept-'+i,platform:i===7?'PS4':'PS5',membership:i%3===0?'PS_PLUS':'NONE'}))},personal:emptyPersonal()};for(const index of [4,5])state.library.games.push({...state.library.games[index],entitlementId:'demo-ps4-'+index,platform:'PS4'});state.personal.categories=['週末雙人','劇情精選','挑戰清單'];state.library.games.forEach((g,i)=>{state.personal.records[g.entitlementId]={...blankRecord(),status:['未開始','想玩','已白金','不再遊玩'][i%4],categories:i%2===0?['劇情精選']:[]};});render();notice('正在探索示範；不會寫入本機或雲端。');};
+$('demo').onclick=()=>{realState=structuredClone(state);demo=true;state={library:{schemaVersion:1,complete:true,syncedAt:null,missingIds:[],games:['ASTRO BOT','Ghost of Yōtei','DEATH STRANDING 2','FINAL FANTASY VII REBIRTH','ELDEN RING','Horizon Forbidden West','God of War Ragnarök','It Takes Two'].map((name,i)=>({name,entitlementId:'demo-'+i,conceptId:'demo-concept-'+i,platform:i===7?'PS4':'PS5',membership:i%3===0?'PS_PLUS':'NONE'}))},personal:emptyPersonal()};for(const index of [4,5])state.library.games.push({...state.library.games[index],entitlementId:'demo-ps4-'+index,platform:'PS4'});state.personal.categories=['週末雙人','劇情精選','挑戰清單'];state.library.games.forEach((g,i)=>{state.personal.records[g.entitlementId]={...blankRecord(),status:['未開始','想玩','已白金','不再遊玩','已棄坑'][i%5],categories:i%2===0?['劇情精選']:[]};});render();notice('正在探索示範；不會寫入本機或雲端。');};
 $('reset-demo').onclick=()=>{if(!demo)return;state=realState;demo=false;selected.clear();category='';view='all';render();notice('已返回你的遊戲庫。');};
 window.addEventListener('storage',event=>{if(event.key===KEY){externalChanged=true;notice('另一個分頁已更新遊戲庫。已停止此頁寫入，請先匯出此頁備份，再重新整理載入最新資料。');}});
 render();renderCloud();

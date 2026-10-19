@@ -129,8 +129,8 @@ test('later concept metadata preserves edits made before automatic grouping was 
  const [grouped]=groupGames(versions());assert.equal(workRecordFor(p,grouped).note,'keep this note');
 });
 
-test('three simplified choices retain existing stored status codes',()=>{
- assert.deepEqual(classificationOptions.map(({label,value})=>[label,value]),[['白金','已白金'],['忽略','不再遊玩'],['追蹤','想玩']]);
+test('four choices retain existing codes and add an independent abandoned status',()=>{
+ assert.deepEqual(classificationOptions.map(({label,value})=>[label,value]),[['白金','已白金'],['追蹤','想玩'],['忽略','不再遊玩'],['棄坑','已棄坑']]);
  assert.equal(classificationFor('遊玩中'),undefined);assert.equal(classificationFor('未開始'),undefined);
  for(const item of classificationOptions){const p=emptyPersonal();p.works['concept:100']={...blankRecord(),status:item.value};assert.equal(personal(JSON.parse(JSON.stringify(p))).works['concept:100'].status,item.value);}
 });
@@ -168,4 +168,27 @@ test('excluding ignored items is an optional filter and never changes their stor
  for(const value of ['已白金','想玩','未開始','遊玩中'])assert.equal(matchesClassification(value,{filter:'exclude-ignored'}),true);
  const p=emptyPersonal();p.works.test={...blankRecord(),status:'不再遊玩'};
  assert.equal(personal(JSON.parse(JSON.stringify(p))).works.test.status,'不再遊玩');
+});
+
+test('multi-select classification is a union and keeps abandoned separate from ignored and unknown',()=>{
+ for(const status of ['想玩','已棄坑'])assert.equal(matchesClassification(status,{filter:['想玩','已棄坑']}),true);
+ for(const status of ['不再遊玩','已白金','未開始'])assert.equal(matchesClassification(status,{filter:['想玩','已棄坑']}),false);
+ assert.equal(matchesClassification('已棄坑',{view:'abandoned'}),true);
+ assert.equal(matchesClassification('不再遊玩',{view:'abandoned'}),false);
+ assert.equal(matchesClassification('已棄坑',{filter:['unclassified']}),false);
+ assert.equal(matchesClassification('遊玩中',{filter:['想玩','unclassified']}),true);
+ assert.equal(matchesClassification('已棄坑',{filter:[]}),true);
+ const p=emptyPersonal();p.records.old={...blankRecord(),status:'不再遊玩'};p.works.new={...blankRecord(),status:'已棄坑'};
+ const restored=parseImport(JSON.parse(JSON.stringify(p))).personal;
+ assert.equal(restored.records.old.status,'不再遊玩');assert.equal(restored.works.new.status,'已棄坑');
+});
+
+test('multi-select platform and membership intersect on one matching entitlement including missing and unknown',()=>{
+ const [work]=groupGames([...versions(),{...game('unknown'),conceptId:'100',platform:'PS5',membership:''}]);
+ assert.equal(matchesWorkFilters(work,{platform:['PS4'],membership:['PS_PLUS','UNKNOWN']}),false);
+ assert.equal(matchesWorkFilters(work,{platform:['PS4','PS5'],membership:['PS_PLUS','NONE']}),true);
+ assert.equal(matchesWorkFilters(work,{platform:['PS5'],membership:['UNKNOWN']}),true);
+ assert.equal(matchesWorkFilters(work,{platform:[],membership:[]}),true);
+ assert.equal(matchesWorkFilters(work,{platform:['PS4','PS5'],membership:['PS_PLUS'],missingOnly:true},['ps4']),false);
+ assert.equal(matchesWorkFilters(work,{platform:['PS4','PS5'],membership:['NONE','UNKNOWN'],missingOnly:true},['ps4']),true);
 });

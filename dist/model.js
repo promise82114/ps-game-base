@@ -1,17 +1,17 @@
-export const statuses = ['未開始', '想玩', '遊玩中', '已破關', '已白金', '暫停', '不再遊玩'];
-// Keep existing stored codes; only these three are offered for new choices.
+export const statuses = ['未開始', '想玩', '遊玩中', '已破關', '已白金', '暫停', '不再遊玩', '已棄坑'];
+// Preserve existing codes; abandoned is separate from the existing ignored status.
 export const classificationOptions = [
   {value:'已白金',label:'白金',icon:'trophy',tone:'platinum'},
-  {value:'不再遊玩',label:'忽略',icon:'circle-x',tone:'ignored'},
   {value:'想玩',label:'追蹤',icon:'bookmark',tone:'tracked'},
+  {value:'不再遊玩',label:'忽略',icon:'circle-x',tone:'ignored'},
+  {value:'已棄坑',label:'棄坑',icon:'log-out',tone:'abandoned'},
 ];
 export const classificationFor = value => classificationOptions.find(option => option.value === value);
 export function matchesClassification(value, {view='all',filter='',customCategory=false} = {}) {
-  if (filter === 'unclassified') { if (classificationFor(value)) return false; }
-  else if (filter === 'exclude-ignored') { if (value === '不再遊玩') return false; }
-  else if (filter && value !== filter) return false;
+  const filters = Array.isArray(filter) ? filter : filter ? [filter] : [];
+  if (filters.length && !filters.some(item => item === 'unclassified' ? !classificationFor(value) : item === 'exclude-ignored' ? value !== '不再遊玩' : value === item)) return false;
   if (!customCategory) {
-    const expected = {platinum:'已白金',ignored:'不再遊玩',tracked:'想玩'}[view];
+    const expected = {platinum:'已白金',ignored:'不再遊玩',tracked:'想玩',abandoned:'已棄坑'}[view];
     if (expected && value !== expected) return false;
   }
   return true;
@@ -95,7 +95,9 @@ export function hasWorkConflicts(data, work) {
 }
 export function matchesWorkFilters(work, {platform='', membership='', missingOnly=false} = {}, missingIds = []) {
   const missing = new Set(missingIds);
-  return work.members.some(g => (!platform || g.platform?.toUpperCase() === platform) && (!membership || (membership === 'UNKNOWN' ? !['NONE','PS_PLUS'].includes(g.membership) : g.membership === membership)) && (!missingOnly || missing.has(g.entitlementId)));
+  const platforms = Array.isArray(platform) ? platform : platform ? [platform] : [];
+  const memberships = Array.isArray(membership) ? membership : membership ? [membership] : [];
+  return work.members.some(g => (!platforms.length || platforms.includes(g.platform?.toUpperCase())) && (!memberships.length || memberships.includes(['NONE','PS_PLUS'].includes(g.membership) ? g.membership : 'UNKNOWN')) && (!missingOnly || missing.has(g.entitlementId)));
 }
 export function mergeLibrary(previous, incoming) {
   const next = library(incoming), old = previous?.games || [];

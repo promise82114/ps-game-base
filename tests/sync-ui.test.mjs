@@ -12,6 +12,7 @@ const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
 const source=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'');
 const fixture=(note='local',ids=['a'])=>({library:{schemaVersion:1,complete:true,games:ids.map(id=>({name:'Game '+id,entitlementId:id,conceptId:id,platform:'PS5'})),missingIds:[]},personal:{...model.emptyPersonal(),works:{'concept:a':{...model.blankRecord(),status:'已白金',note}}}});
 const backup=data=>({schemaVersion:1,kind:'ps-game-base-backup',...data,missingIds:[],exportedAt:'2026-10-17T00:00:00Z'});
+function setFilters(nodes,id,values){for(const button of nodes.get(id).querySelectorAll('button'))if((button['aria-pressed']==='true')!==values.includes(button.dataset.value))button.onclick();}
 function setup(initial=fixture()){
  class Node {
   constructor(tag='div'){this.tag=tag;this.children=[];this.dataset={};this.listeners={};this.value='';this.open=false;this.hidden=false;this.disabled=false;this.textContent='';this.classList={add(){},remove(){},toggle(){}};}
@@ -55,23 +56,23 @@ test('library renders every work beyond the old page size and filters the full r
  const data=fixture('',Array.from({length:125},(_,i)=>String(i).padStart(3,'0')));
  data.library.games.forEach((g,i)=>{g.platform=i%2?'PS4':'PS5';});
  const {nodes}=setup(data),grid=nodes.get('grid'),search=nodes.get('search');
- nodes.get('status').value='';nodes.get('status').listeners.change();
+ nodes.get('clear-filters').onclick();
  const titles=()=>grid.querySelectorAll('button').map(n=>n.textContent);
  assert.equal(grid.children.length,125);assert.equal(titles().at(-1),'Game 124');
  assert.match(nodes.get('result-count').textContent,/125 部作品 · 125 筆授權/);
- nodes.get('platform').value='PS5';nodes.get('platform').listeners.change();
+ setFilters(nodes,'platform',['PS5']);
  assert.equal(grid.children.length,63);assert.equal(titles().at(-1),'Game 124');
  search.value='Game 124';search.listeners.input();assert.deepEqual(titles(),['Game 124']);
  search.value='no matching game';search.listeners.input();assert.equal(grid.children.length,0);assert.equal(nodes.get('empty').hidden,false);
  search.value='';search.listeners.input();assert.equal(grid.children.length,63);
- nodes.get('platform').value='';nodes.get('platform').listeners.change();assert.equal(grid.children.length,125);
+ setFilters(nodes,'platform',[]);assert.equal(grid.children.length,125);
 });
 
 test('cards show a Plus icon for any Plus entitlement and omit other membership labels',()=>{
  const data=fixture('',[]);
  data.library.games=[['owned','NONE'],['unknown',''],['plus','PS_PLUS'],['mixed','NONE'],['mixed','PS_PLUS']].map(([conceptId,membership],i)=>({name:conceptId,entitlementId:String(i),conceptId,membership,platform:i===4?'PS4':'PS5'}));
  const before=JSON.stringify(data),{nodes,storage}=setup(data);
- nodes.get('status').value='';nodes.get('status').listeners.change();
+ nodes.get('clear-filters').onclick();
  const cards=()=>nodes.get('grid').children.map(card=>({name:card.querySelectorAll('button')[0].textContent,meta:card.children[1].children.find(n=>n.className==='card-meta')}));
  assert.equal(cards().length,4);
  for(const {name,meta} of cards()){
@@ -80,7 +81,7 @@ test('cards show a Plus icon for any Plus entitlement and omit other membership 
   assert.ok(meta.children.every(n=>!['非 PS Plus','來源未分類','多種授權','PS Plus'].includes(n.textContent)));
   if(badges.length){assert.equal(badges[0]['aria-label'],'PS PLUS');assert.equal(badges[0].children[0].tag,'svg');}
  }
- nodes.get('membership').value='NONE';nodes.get('membership').listeners.change();
+ setFilters(nodes,'membership',['NONE']);
  assert.equal(cards().find(card=>card.name==='mixed').meta.children.at(-1).className,'ps-plus-badge');
  assert.equal(storage.get(KEY),before);
 });
@@ -89,15 +90,48 @@ test('select all includes every filtered result and preserves selection across f
  const data=fixture('',Array.from({length:125},(_,i)=>String(i).padStart(3,'0')));
  data.library.games.forEach((g,i)=>{g.platform=i%2?'PS4':'PS5';});
  const {nodes,storage}=setup(data);
- nodes.get('status').value='';nodes.get('status').listeners.change();
- nodes.get('platform').value='PS5';nodes.get('platform').listeners.change();nodes.get('select-all').onclick();
+ nodes.get('clear-filters').onclick();
+ setFilters(nodes,'platform',['PS5']);nodes.get('select-all').onclick();
  assert.equal(nodes.get('selected-count').textContent,'已選 63 部作品');
- nodes.get('platform').value='PS4';nodes.get('platform').listeners.change();nodes.get('select-all').onclick();
+ setFilters(nodes,'platform',['PS4']);nodes.get('select-all').onclick();
  assert.equal(nodes.get('selected-count').textContent,'已選 125 部作品');
  nodes.get('batch-status').value='想玩';nodes.get('apply-status').onclick();
  const saved=JSON.parse(storage.get(KEY));assert.equal(Object.keys(saved.personal.works).length,126);
  for(const g of data.library.games)assert.equal(saved.personal.works['concept:'+g.conceptId].status,'想玩');
  nodes.get('clear-selection').onclick();assert.equal(nodes.get('batch').hidden,true);
+});
+
+test('classification chips combine with platform and source without writing data; clearing restores every work',()=>{
+ const data=fixture('', ['a','b','c','d','e']);
+ data.library.games.forEach((g,i)=>{g.platform=i===2?'PS4':'PS5';g.membership=i===1?'PS_PLUS':'NONE';data.personal.works['concept:'+g.conceptId]={...model.blankRecord(),status:['已白金','想玩','已棄坑','不再遊玩','遊玩中'][i]};});
+ data.library.games.push({...data.library.games[2],entitlementId:'c-plus',platform:'PS5',membership:'PS_PLUS'});
+ const {nodes,storage}=setup(data),before=storage.get(KEY),grid=nodes.get('grid');
+ assert.equal(nodes.get('stat-total').textContent,5);assert.equal(nodes.get('heading-total').textContent,5);assert.equal(nodes.get('stat-abandoned').textContent,1);assert.equal(nodes.get('stat-ignored').textContent,1);
+ assert.equal(nodes.get('stat-unclassified').textContent,1);
+ setFilters(nodes,'status',['想玩','已棄坑']);assert.equal(grid.children.length,2);
+ assert.equal(nodes.get('stat-unclassified').textContent,1);assert.equal(nodes.get('stat-total').textContent,5);
+ setFilters(nodes,'platform',['PS4']);setFilters(nodes,'membership',['PS_PLUS','UNKNOWN']);assert.equal(grid.children.length,0);
+ setFilters(nodes,'platform',['PS4','PS5']);assert.equal(grid.children.length,2);
+ setFilters(nodes,'status',['unclassified','已棄坑']);setFilters(nodes,'membership',[]);assert.equal(grid.children.length,2);
+ nodes.get('clear-filters').onclick();assert.equal(grid.children.length,5);assert.equal(storage.get(KEY),before);
+ for(const id of ['platform','membership','status'])assert.ok(nodes.get(id).children.every(button=>button['aria-pressed']==='false'));
+ assert.doesNotMatch(html,/<select id="(?:platform|status|membership|sort)"/);
+});
+
+test('abandoned can be selected and cleared on the cover, edited and batch applied with persistence',()=>{
+ const {nodes,storage}=setup(fixture('keep',['a','b']));
+ const quick=()=>nodes.get('grid').children[0].querySelectorAll('input').find(input=>input.value==='已棄坑');
+ quick().onclick({preventDefault(){}});assert.equal(JSON.parse(storage.get(KEY)).personal.works['concept:a'].status,'已棄坑');assert.equal(nodes.get('stat-abandoned').textContent,1);
+ quick().onclick({preventDefault(){}});assert.equal(JSON.parse(storage.get(KEY)).personal.works['concept:a'].status,'未開始');
+ assert.equal(nodes.get('stat-unclassified').textContent,2);
+ nodes.get('grid').children[0].querySelectorAll('button')[0].onclick();
+ const choice=nodes.get('edit-classifications').querySelectorAll('input').find(input=>input.value==='已棄坑');choice.checked=true;choice.onchange();nodes.get('edit-form').onsubmit({preventDefault(){}});
+ assert.equal(JSON.parse(storage.get(KEY)).personal.works['concept:a'].status,'已棄坑');
+ assert.equal(nodes.get('stat-unclassified').textContent,1);
+ nodes.get('select-all').onclick();nodes.get('batch-status').value='已棄坑';nodes.get('apply-status').onclick();
+ const saved=JSON.parse(storage.get(KEY));assert.equal(saved.personal.works['concept:b'].status,'已棄坑');assert.equal(saved.personal.works['concept:a'].note,'keep');
+ const reloaded=setup(saved);assert.equal(reloaded.nodes.get('stat-abandoned').textContent,2);setFilters(reloaded.nodes,'status',['已棄坑']);assert.equal(reloaded.nodes.get('grid').children.length,2);
+ assert.equal(reloaded.nodes.get('stat-unclassified').textContent,0);
 });
 
 test('preview and cancel do not write data',()=>{
