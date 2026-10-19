@@ -20,6 +20,7 @@ npm start
 發布設定檔為 `.github/workflows/deploy.yml`，沿用 EDF 專案的 Pages Actions 流程，直接將 `dist` 上傳發布，無須建置。
 
 - 推送到 `main` 時自動發布；也可在 Actions 手動執行。手動選擇其他分支時會跳過部署。
+- 發布前自動用本次 commit SHA 更新本機 JS／CSS 網址的 `?v=`，涵蓋入口、共用腳本及 ES module 相依檔案，避免新版 HTML 混用舊快取。直接發布 `dist/` 前可先執行 `node tools/version-assets.mjs <版本號>`；同次發布共用一個新版本號，不需更改 Tampermonkey 的腳本版本。
 - GitHub repo 的 Settings → Pages → Build and deployment → Source 須選擇 **GitHub Actions**。
 - 此 repo 的預設 Pages 網址為 `https://promise82114.github.io/ps-game-base/`；實際發布網址以 Actions 的部署結果為準。
 - 已在腳本中允許 `https://promise82114.github.io` 回傳來源。更新網站後，仍須重新安裝／更新 Tampermonkey 中的整合腳本至 0.4.1。

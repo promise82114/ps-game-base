@@ -2,6 +2,13 @@
 
 更新日期：2026-10-19（Asia/Taipei）。本文件是交接快照；接手先讀 [AGENTS.md](../AGENTS.md)，再核對 Git 與實際檔案。使用操作及資料格式詳見 [README](../README.md)，獎盃測試細節見 [trophy-probe.md](trophy-probe.md)。
 
+## 2026-10-19 JS／CSS 快取版本
+
+- 基準 HEAD `36332c5`（main）；使用者已自行推送前次提交。新 HTML 混用舊 app.js 的情境已重現：舊版綁定已移除的 mobile-settings 時中斷，後續資料操作按鈕無事件；使用者確認強制重新整理後恢復。
+- `dist/index.html` 的本機 JS／CSS（含腳本安裝連結）及 app／sync／platinum 的模組相依網址統一加上 `?v=20261019-1`。新增 `tools/version-assets.mjs`，保留其他查詢參數與 fragment，略過外部 URL，不修改 userscript 本文或其 metadata 版本。
+- Pages 發布前自動以 `$GITHUB_SHA` 更新同組資源網址，之後每筆新提交部署都會換版；直接發布 dist 前可執行 `node tools/version-assets.mjs <新版本號>`。不新增套件、打包步驟或改動本機資料格式。
+- 完整 Node 測試 159 項通過，包含跨層模組、重複執行、換版、外部來源及 userscript 保留；語法與 diff 檢查通過。獨立來源 `127.0.0.1:4181` 的真實瀏覽器確認 JS／CSS 帶一致版號、模組初始化並完成 render，無 console error／warning。使用者已要求提交及推送；最終提交與遠端狀態以 Git 核對，Pages 實際發布須待部署後另行驗收。
+
 ## 2026-10-19 免助手直接授權修正（待 Chrome 驗收）
 
 - 使用者覺得每次開 PowerShell 麻煩，要求整合腳本直接完成白金同步。v0.4.1 正式按鈕不再呼叫本機助手，改用 GM `cookie` 選項向固定 Sony authorize 端點傳 NPSSO，manual redirect 嚴格驗證 code，再直接交換 token（token POST 也 manual）；不新增 connect／grant、不自動回退 localhost。

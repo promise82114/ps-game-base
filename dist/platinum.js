@@ -1,4 +1,4 @@
-import {groupGames,workRecordFor} from './model.js';
+import {groupGames,workRecordFor} from './model.js?v=20261019-1';
 
 const titleId = game => ['PS4','PS5'].includes(game.platform?.toUpperCase()) && /^(CUSA|PPSA)\d{5}_\d{2}$/i.test(game.titleId || '') ? game.titleId.toUpperCase() : null;
 function currentWorks(library) {
